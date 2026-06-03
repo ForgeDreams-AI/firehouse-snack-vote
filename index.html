@@ -1,3 +1,829 @@
-SCRIPT_URL:    "https://script.google.com/macros/s/YOUR_ID/exec",
-ITEMS_CSV_URL: "https://docs.google.com/spreadsheets/d/2PACX-1vTd0SgxxSNZvO2BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=0&single=true&output=csv",
-VOTES_CSV_URL: "https://docs.google.com/spreadsheets/d/2PACX-1vTd0SgxxSNZvO2BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=318533049&single=true&output=csv"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Firehouse Snack Vote</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Archivo:wght@400;500;600;700&display=swap');
+
+:root{
+  --red:#C8102E; --red-deep:#8E0B20; --amber:#FFB400;
+  --char:#15171B; --char2:#1E2127; --steel:#2A2E36; --line:#33373F;
+  --cream:#F3EFE7; --mut:#8A909A; --mut2:#6B7079;
+  --good:#3DBE6B;
+  --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  font-family:'Archivo',system-ui,sans-serif;background:var(--char);color:var(--cream);
+  min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden;
+  background-image:
+    radial-gradient(circle at 15% -10%, #25272e 0%, transparent 45%),
+    repeating-linear-gradient(45deg, transparent 0 22px, rgba(255,255,255,.012) 22px 44px);
+}
+.wrap{max-width:880px;margin:0 auto;padding:0 14px 110px;}
+
+/* ---- header ---- */
+.head{position:relative;background:linear-gradient(180deg,var(--red) 0%,var(--red-deep) 100%);
+  border-bottom:4px solid var(--amber);overflow:hidden;}
+.headwrap{max-width:880px;margin:0 auto;padding:26px 18px 24px;}
+.kicker{font-family:'Oswald';font-weight:600;letter-spacing:3px;font-size:11px;
+  color:#ffd9df;text-transform:uppercase;}
+.title{font-family:'Oswald';font-weight:700;font-size:clamp(30px,7vw,52px);line-height:.95;
+  text-transform:uppercase;letter-spacing:1px;margin:5px 0 7px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.22);}
+.sub{font-size:14px;max-width:560px;color:#ffe7ea;line-height:1.5;}
+.hazard{height:8px;background:repeating-linear-gradient(45deg,#15171B 0 16px,var(--amber) 16px 32px);opacity:.9;}
+
+/* ---- tabs ---- */
+.tabs{display:flex;gap:8px;margin:16px 0 4px;}
+.tab{flex:1;font-family:'Oswald';font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+  font-size:14px;padding:13px;border:2px solid var(--line);background:var(--char2);color:var(--mut);
+  cursor:pointer;border-radius:10px;transition:.15s;}
+.tab:hover{color:var(--cream);}
+.tab.on{background:var(--red);color:#fff;border-color:var(--amber);}
+
+/* ---- name + filters ---- */
+.namebar{position:sticky;top:0;z-index:20;background:rgba(21,23,27,.96);
+  backdrop-filter:blur(6px);padding:12px 0 10px;border-bottom:1px solid var(--line);margin-bottom:6px;}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mut);margin-bottom:6px;
+  font-family:'Oswald';font-weight:600;}
+.name{width:100%;padding:14px 16px;font-size:16px;font-family:'Archivo';background:var(--char2);
+  border:2px solid var(--line);border-radius:10px;color:var(--cream);outline:none;}
+.name:focus{border-color:var(--amber);}
+.namehelp{font-size:12px;color:var(--mut);margin-top:6px;line-height:1.4;}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px;}
+.filter{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#c4c9d1;cursor:pointer;
+  user-select:none;background:var(--char2);border:2px solid var(--line);border-radius:30px;padding:8px 13px 8px 9px;}
+.filter.on{border-color:var(--amber);color:var(--cream);}
+.toggle{width:38px;height:22px;border-radius:14px;background:var(--steel);position:relative;transition:.2s;flex:none;}
+.filter.on .toggle{background:var(--amber);}
+.knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;}
+.filter.on .knob{left:19px;}
+
+/* ---- ballot ---- */
+.cat{margin-top:22px;}
+.catname{font-family:'Oswald';font-weight:600;font-size:19px;text-transform:uppercase;letter-spacing:1px;
+  padding-bottom:8px;border-bottom:2px solid var(--red);color:var(--cream);
+  display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.catcount{font-size:13px;letter-spacing:1px;color:var(--mut);flex:none;}
+.catcount.full{color:var(--amber);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px;margin-top:12px;}
+.item{display:flex;align-items:center;gap:10px;padding:13px;border:2px solid var(--line);
+  background:var(--char2);border-radius:10px;cursor:pointer;font-size:14.5px;color:var(--cream);
+  line-height:1.25;text-align:left;width:100%;transition:.12s;min-height:54px;}
+.item:hover{border-color:#565c66;}
+.item.sel{background:linear-gradient(180deg,var(--red) 0%,var(--red-deep) 100%);border-color:var(--amber);color:#fff;}
+.item.lock{opacity:.38;cursor:not-allowed;}
+.item.lock:hover{border-color:var(--line);}
+.writein{width:100%;margin-top:12px;padding:13px;background:var(--char2);border:2px solid var(--line);
+  border-radius:10px;color:var(--cream);font-family:'Archivo';font-size:14.5px;line-height:1.4;
+  outline:none;resize:vertical;min-height:66px;}
+.writein:focus{border-color:var(--amber);}
+.check{width:22px;height:22px;border-radius:6px;border:2px solid #5a6068;flex:none;display:grid;
+  place-items:center;font-size:14px;font-weight:700;}
+.item.sel .check{background:var(--amber);border-color:var(--amber);color:#15171B;}
+.iname{flex:1;}
+.badges{display:flex;gap:3px;flex:none;font-size:14px;line-height:1;}
+
+/* ---- submit ---- */
+.submit{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:40;
+  font-family:'Oswald';font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-size:16px;
+  padding:15px 32px;background:var(--amber);color:#15171B;border:none;border-radius:50px;cursor:pointer;
+  box-shadow:0 8px 26px rgba(0,0,0,.5);max-width:calc(100% - 28px);}
+.submit:disabled{background:var(--steel);color:#6b7079;cursor:not-allowed;box-shadow:none;}
+
+/* ---- results ---- */
+.statrow{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0;}
+.statcard{flex:1;min-width:120px;background:var(--char2);border:2px solid var(--line);border-radius:12px;padding:15px;}
+.statnum{font-family:'Oswald';font-size:34px;font-weight:700;color:var(--amber);line-height:1;}
+.statlbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-top:5px;}
+.row{margin:9px 0;}
+.rowtop{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:4px;gap:8px;}
+.rname{flex:1;}
+.rct{font-family:'Oswald';font-weight:600;color:var(--amber);flex:none;font-size:14px;}
+.bar{height:13px;background:var(--steel);border-radius:7px;overflow:hidden;}
+.fill{height:100%;background:linear-gradient(90deg,var(--red),var(--amber));border-radius:7px;transition:width .4s;}
+.toolbar{display:flex;gap:8px;margin-bottom:8px;}
+.btn{font-family:'Oswald';font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:13px;
+  padding:11px 18px;background:var(--char2);color:var(--cream);border:2px solid var(--line);
+  border-radius:9px;cursor:pointer;}
+.btn:hover{border-color:#565c66;}
+
+/* ---- shared states ---- */
+.note{font-size:12.5px;color:var(--mut2);margin-top:8px;line-height:1.5;}
+.center{text-align:center;padding:48px 18px;}
+.center h2{font-family:'Oswald';font-size:30px;text-transform:uppercase;color:var(--amber);margin-bottom:8px;}
+.center p{color:#c4c9d1;line-height:1.5;}
+.link{color:var(--amber);text-decoration:underline;cursor:pointer;background:none;border:none;font:inherit;padding:0;}
+.msg{border-radius:10px;padding:13px 15px;font-size:13.5px;line-height:1.5;margin:14px 0;}
+.msg.warn{background:#3a2a00;border:2px solid var(--amber);color:#ffe9b0;}
+.msg.err{background:#3a1416;border:2px solid var(--red);color:#ffd2d6;}
+.spinner{width:30px;height:30px;border:3px solid var(--steel);border-top-color:var(--amber);
+  border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:var(--good);
+  color:#06270f;font-weight:600;font-size:14px;padding:11px 20px;border-radius:30px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+.hide{display:none;}
+/* ---- budget ---- */
+.bgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin:16px 0 6px;}
+.bfield{display:flex;flex-direction:column;gap:5px;font-size:11px;text-transform:uppercase;letter-spacing:1px;
+  color:var(--mut);font-family:'Oswald';font-weight:600;}
+.bnum{padding:11px 12px;font-size:16px;font-family:'Archivo';background:var(--char2);border:2px solid var(--line);
+  border-radius:9px;color:var(--cream);outline:none;}
+.bnum:focus{border-color:var(--amber);}
+.brow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);}
+.binfo{flex:1;min-width:0;}
+.bname{font-size:14.5px;line-height:1.25;}
+.bmeta{font-size:12px;color:var(--mut2);margin-top:3px;}
+.bqty{display:flex;align-items:center;gap:6px;flex:none;}
+.qbtn{width:32px;height:32px;border-radius:8px;border:2px solid var(--line);background:var(--char2);
+  color:var(--cream);font-size:18px;font-weight:700;cursor:pointer;line-height:1;display:grid;place-items:center;}
+.qbtn:hover{border-color:var(--amber);}
+.qin{width:46px;text-align:center;padding:7px 4px;font-size:15px;font-family:'Archivo';background:var(--char);
+  border:2px solid var(--line);border-radius:8px;color:var(--cream);outline:none;}
+.qin:focus{border-color:var(--amber);}
+.bcost{flex:none;width:64px;text-align:right;font-family:'Oswald';font-weight:600;font-size:14.5px;color:var(--cream);}
+.bsum{margin:20px 0 0;background:var(--char2);border:2px solid var(--line);border-radius:12px;padding:16px;}
+.bbar{height:16px;background:var(--steel);border-radius:8px;overflow:hidden;margin-bottom:14px;}
+.bbarfill{height:100%;background:linear-gradient(90deg,var(--good),var(--amber));border-radius:8px;transition:width .4s;}
+.bbarfill.over{background:linear-gradient(90deg,var(--amber),var(--red));}
+.bsumrow{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:14.5px;color:#c4c9d1;}
+.bsumrow strong{font-family:'Oswald';font-size:18px;color:var(--cream);}
+.green{color:var(--good)!important;}
+.red{color:#ff6b73!important;}
+</style>
+</head>
+<body>
+
+<div class="head"><div class="headwrap">
+  <div class="kicker">Crew Snack Vote</div>
+  <div class="title">Firehouse Snack Vote</div>
+  <div class="sub">Pick up to <strong>3 per section</strong>. Badges: <strong>🟢 pocket-proof</strong> (survives your turnouts) and <strong>🫠 melts</strong> in the heat. No account needed.</div>
+</div></div>
+<div class="hazard"></div>
+
+<div class="wrap">
+  <div id="banner"></div>
+  <div class="tabs">
+    <button id="tab-vote" class="tab on" type="button">Vote</button>
+    <button id="tab-results" class="tab" type="button">Results</button>
+    <button id="tab-budget" class="tab" type="button">Budget</button>
+  </div>
+  <div id="vote-view"></div>
+  <div id="results-view" class="hide"></div>
+  <div id="budget-view" class="hide"></div>
+</div>
+
+<div id="toast" class="toast">Vote submitted</div>
+
+<script>
+/* ============================================================================
+   CONFIG  —  paste your three URLs here, then re-upload index.html.
+   See README.md for exactly where each one comes from.
+   ============================================================================ */
+const CONFIG = {
+  SCRIPT_URL:    "https://script.google.com/macros/s/AKfycbzHCt5URYTHvivzAvxS4_MVcZfcapBvkV7uC34diQ7LKW5Pesollxb7FjSV4IuLflQJeg/exec", // votes POST here
+  ITEMS_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=0&single=true&output=csv",
+  VOTES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=1318533049&single=true&output=csv"
+};
+/* ========================================================================== */
+
+/* ---------- app state ---------- */
+let ITEMS = [];          // [{category, item, pp, melt, active}]
+let CATEGORY_ORDER = []; // category names in first-seen order
+let ITEM_META = {};      // lowercased item -> {item, category, pp, melt}
+let itemsLoaded = false;
+let itemsPromise = null;
+
+let selected = {};       // item name -> true
+let voterName = "";
+let writeinText = "";    // typed write-in suggestions (banked, promoted weekly)
+let ppOnly = false;      // filter: pocket-proof only
+let hideMelty = false;   // filter: hide melty stuff
+let submitting = false;
+
+const MAX_PER_CATEGORY = 3; // each voter may pick at most this many items per section
+
+let budgetCfg = { people: 55, perPerson: 2, days: 7, weekly: 850 };
+let planQty = {};        // winning item -> packs to buy
+let planSeeded = false;  // seed suggested quantities once
+
+/* ---------- tiny config guards ---------- */
+function isSet(url){ return url && url.indexOf("PASTE_") === -1; }
+function scriptReady(){ return isSet(CONFIG.SCRIPT_URL); }
+function itemsUrlReady(){ return isSet(CONFIG.ITEMS_CSV_URL); }
+function votesUrlReady(){ return isSet(CONFIG.VOTES_CSV_URL); }
+
+/* ============================================================================
+   CSV PARSER  (inline, no library — survives a CDN outage)
+   Handles quoted fields, escaped "" quotes, and \r\n / \n line endings.
+   ============================================================================ */
+function parseCSV(text){
+  const rows = []; let row = [], field = "", q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){
+      if (ch === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else q = false; }
+      else field += ch;
+    } else {
+      if (ch === '"') q = true;
+      else if (ch === ','){ row.push(field); field = ""; }
+      else if (ch === '\n'){ row.push(field); rows.push(row); row = []; field = ""; }
+      else if (ch === '\r'){ /* ignore */ }
+      else field += ch;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+/* Map a header row to column indexes by (trimmed, lowercased) name,
+   so column ORDER in the sheet doesn't matter. */
+function headerIndex(headerRow){
+  const idx = {};
+  headerRow.forEach((h, i) => { idx[String(h).trim().toLowerCase()] = i; });
+  return idx;
+}
+function truthy(v){
+  const s = String(v == null ? "" : v).trim().toLowerCase();
+  return s === "y" || s === "yes" || s === "true" || s === "1";
+}
+/* Map the Tag dropdown value to the two badge flags.
+   Fire Ground -> pocket-proof | Heat -> melts | Both -> both | blank -> neither */
+function tagToFlags(v){
+  const t = String(v == null ? "" : v).trim().toLowerCase();
+  if (t === "both") return { pp: true, melt: true };
+  if (t === "fire ground" || t === "fireground" || t === "fire") return { pp: true, melt: false };
+  if (t === "heat") return { pp: false, melt: true };
+  return { pp: false, melt: false };
+}
+/* Parse a number from a cell, stripping $ and commas. Returns null if empty/NaN. */
+function num(v){
+  const n = parseFloat(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
+  return isFinite(n) ? n : null;
+}
+
+/* ============================================================================
+   ITEMS  (the ballot — built entirely from the Items tab)
+   ============================================================================ */
+function loadItems(force){
+  if (itemsPromise && !force) return itemsPromise;
+  itemsPromise = (async () => {
+    if (!itemsUrlReady()) throw new Error("ITEMS_CSV_URL not set");
+    const url = CONFIG.ITEMS_CSV_URL + (CONFIG.ITEMS_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rows = parseCSV(await res.text()).filter(r => r.length && r.some(c => String(c).trim() !== ""));
+    if (!rows.length) throw new Error("empty");
+
+    const h = headerIndex(rows[0]);
+    const cCat = h["category"], cItem = h["item"];
+    const cTag = h["tag"];                          // new single dropdown column
+    const cPP = h["pocketproof"], cMelt = h["melts"]; // legacy fallback columns
+    const cAct = h["active"];
+    const cPrice = h["price"], cServ = h["servings"]; // optional, for the Budget tab
+    if (cCat == null || cItem == null) throw new Error("Items tab needs Category and Item columns");
+
+    const items = [], order = [], meta = {}, seenCat = {};
+    for (let i = 1; i < rows.length; i++){
+      const r = rows[i];
+      const category = String(r[cCat] == null ? "" : r[cCat]).trim();
+      const item = String(r[cItem] == null ? "" : r[cItem]).trim();
+      if (!category || !item) continue;
+      const active = cAct == null ? true : truthy(r[cAct]);
+      if (!active) continue;
+      let pp, melt;
+      if (cTag != null){                            // Tag wins when present
+        const f = tagToFlags(r[cTag]); pp = f.pp; melt = f.melt;
+      } else {
+        pp = cPP == null ? false : truthy(r[cPP]);
+        melt = cMelt == null ? false : truthy(r[cMelt]);
+      }
+      const price = cPrice == null ? null : num(r[cPrice]);
+      const servings = cServ == null ? null : num(r[cServ]);
+      items.push({ category, item, pp, melt, price, servings });
+      meta[item.toLowerCase()] = { item, category, pp, melt, price, servings };
+      if (!seenCat[category]){ seenCat[category] = true; order.push(category); }
+    }
+    ITEMS = items; CATEGORY_ORDER = order; ITEM_META = meta; itemsLoaded = true;
+    return items;
+  })();
+  return itemsPromise;
+}
+
+/* ============================================================================
+   VIEW SWITCHING
+   ============================================================================ */
+function setView(v){
+  ['vote','results','budget'].forEach(name => {
+    document.getElementById('tab-' + name).className = 'tab' + (v === name ? ' on' : '');
+    document.getElementById(name + '-view').className = (v === name ? '' : 'hide');
+  });
+  if (v === 'results') loadResults();
+  if (v === 'budget') loadBudget();
+}
+document.getElementById('tab-vote').addEventListener('click', () => setView('vote'));
+document.getElementById('tab-results').addEventListener('click', () => setView('results'));
+document.getElementById('tab-budget').addEventListener('click', () => setView('budget'));
+
+/* ============================================================================
+   VOTE VIEW
+   ============================================================================ */
+async function initVote(){
+  const el = document.getElementById('vote-view');
+  if (!itemsUrlReady()){
+    el.innerHTML = `<div class="msg warn"><b>Not connected yet.</b> Paste your three URLs into the CONFIG block at the top of <code>index.html</code>, then re-upload the file. Until then the ballot can't load.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="center"><div class="spinner"></div><p>Loading the ballot…</p></div>`;
+  try {
+    await loadItems(true);
+    renderVote();
+  } catch (e){
+    if (String(e.message) === "empty" || ITEMS.length === 0){
+      el.innerHTML = `<div class="msg warn">No snacks loaded yet — check the <b>Items</b> tab. Add some rows (and make sure <b>Active</b> is set to y).</div>`;
+    } else {
+      el.innerHTML = `<div class="msg err"><b>Couldn't load the snack list.</b> Likely cause: the Sheet isn't published to the web as CSV yet, or the Items CSV URL is wrong.<br><span class="note" style="color:#ffd2d6">(${esc(e.message)})</span></div>`;
+    }
+  }
+}
+
+function renderVote(){
+  const el = document.getElementById('vote-view');
+
+  let h = `<div class="namebar">
+      <div class="lbl">Your name</div>
+      <input id="nameInput" class="name" autocomplete="off" placeholder="Use first name + last initial (e.g. Mike R.)" value="${esc(voterName)}">
+      <div class="namehelp">Use first name + last initial (e.g. Mike R.) — duplicates by name get overwritten.</div>
+      <div class="filters">
+        <div class="filter${ppOnly ? ' on' : ''}" id="f-pp"><div class="toggle"><div class="knob"></div></div>Pocket-proof only</div>
+        <div class="filter${hideMelty ? ' on' : ''}" id="f-melt"><div class="toggle"><div class="knob"></div></div>Hide melty stuff</div>
+      </div>
+    </div>`;
+
+  let shownAny = false;
+  CATEGORY_ORDER.forEach(cat => {
+    const list = ITEMS.filter(it =>
+      it.category === cat &&
+      (!ppOnly || it.pp) &&
+      (!hideMelty || !it.melt)
+    );
+    if (!list.length) return;
+    shownAny = true;
+    const csel = categorySelectedCount(cat);
+    const maxed = csel >= MAX_PER_CATEGORY;
+    h += `<div class="cat"><div class="catname">${esc(cat)}<span class="catcount${maxed ? ' full' : ''}">${csel}/${MAX_PER_CATEGORY}</span></div><div class="grid">`;
+    list.forEach(it => {
+      const on = !!selected[it.item];
+      const lock = maxed && !on;
+      const badges = (it.pp ? '🟢' : '') + (it.melt ? '🫠' : '');
+      h += `<button class="item${on ? ' sel' : ''}${lock ? ' lock' : ''}" type="button" data-item="${esc(it.item)}">
+              <span class="check">${on ? '✓' : ''}</span>
+              <span class="iname">${esc(it.item)}</span>
+              <span class="badges">${badges}</span>
+            </button>`;
+    });
+    h += `</div></div>`;
+  });
+
+  if (!shownAny){
+    h += `<div class="msg warn">No snacks match your filters. Try turning a filter off.</div>`;
+  }
+
+  // Write-in box. Suggestions are banked and promoted onto the ballot each Monday.
+  h += `<div class="cat"><div class="catname">Missing something?</div>
+      <textarea id="writein" class="writein" placeholder="Write in snacks we don't stock yet — one per line. Crew write-ins get added to the ballot every Monday.">${esc(writeinText)}</textarea></div>`;
+
+  const ready = canSubmit();
+  h += `<button id="submitBtn" class="submit" type="button" ${ready ? '' : 'disabled'}>${submitLabel()}</button>`;
+  el.innerHTML = h;
+
+  // wire events (no inline handlers)
+  document.getElementById('nameInput').addEventListener('input', onName);
+  document.getElementById('f-pp').addEventListener('click', () => { ppOnly = !ppOnly; renderVote(); });
+  document.getElementById('f-melt').addEventListener('click', () => { hideMelty = !hideMelty; renderVote(); });
+  el.querySelectorAll('.item').forEach(btn => {
+    btn.addEventListener('click', () => pick(btn.getAttribute('data-item')));
+  });
+  document.getElementById('submitBtn').addEventListener('click', submitVote);
+  const wiBox = document.getElementById('writein');
+  if (wiBox) wiBox.addEventListener('input', () => { writeinText = wiBox.value; refreshSubmitBtn(); });
+}
+
+function selectedCount(){ return Object.keys(selected).filter(k => selected[k]).length; }
+function canSubmit(){ return !!voterName.trim() && (selectedCount() > 0 || writeinText.trim().length > 0); }
+function categorySelectedCount(cat){
+  if (!cat) return 0;
+  let n = 0;
+  Object.keys(selected).forEach(it => {
+    if (selected[it] && (ITEM_META[it.toLowerCase()] || {}).category === cat) n++;
+  });
+  return n;
+}
+function submitLabel(){
+  if (submitting) return 'Submitting…';
+  if (!voterName.trim()) return 'Enter your name first';
+  const c = selectedCount();
+  if (c === 0 && writeinText.trim()) return 'Submit write-in';
+  if (c === 0) return 'Pick a snack or write one in';
+  return 'Submit ' + c + ' pick' + (c === 1 ? '' : 's');
+}
+function refreshSubmitBtn(){
+  const b = document.getElementById('submitBtn');
+  if (!b) return;
+  b.disabled = submitting || !canSubmit();
+  b.textContent = submitLabel();
+}
+function onName(){ voterName = document.getElementById('nameInput').value; refreshSubmitBtn(); }
+function pick(item){
+  if (!item) return;
+  if (!selected[item]){
+    // turning ON — enforce the per-section cap
+    const cat = (ITEM_META[item.toLowerCase()] || {}).category;
+    if (categorySelectedCount(cat) >= MAX_PER_CATEGORY){
+      showToast('Max ' + MAX_PER_CATEGORY + ' per section — un-pick one first');
+      return;
+    }
+  }
+  selected[item] = !selected[item];
+  renderVote();
+}
+
+async function submitVote(){
+  if (submitting) return;
+  voterName = (document.getElementById('nameInput') || {}).value || voterName;
+  const wiBox = document.getElementById('writein');
+  if (wiBox) writeinText = wiBox.value;
+  const items = Object.keys(selected).filter(k => selected[k]);
+  const suggestion = writeinText.trim();
+  if (!voterName.trim()){ alert("Add your name first."); return; }
+  if (!items.length && !suggestion){ alert("Pick a snack or write one in."); return; }
+  if (!scriptReady()){
+    alert("Not connected to Google yet — paste SCRIPT_URL into the CONFIG block at the top of index.html.");
+    return;
+  }
+
+  submitting = true; refreshSubmitBtn();
+  const payload = { name: voterName.trim(), items: items, suggestion: suggestion, timestamp: new Date().toISOString() };
+
+  try {
+    // Fire-and-forget: text/plain + no-cors dodges the CORS preflight.
+    // We CANNOT read this response, so we go optimistic and re-fetch Votes.
+    await fetch(CONFIG.SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+  } catch (e){
+    submitting = false; refreshSubmitBtn();
+    alert("Couldn't reach Google — check your connection and try again.");
+    return;
+  }
+
+  showToast("Vote submitted — thanks, " + voterName.trim());
+  writeinText = "";                   // clear so it isn't resubmitted
+  submitting = false;
+  setView('results');
+  setTimeout(() => loadResults(), 4000);
+}
+
+/* ============================================================================
+   RESULTS VIEW
+   ============================================================================ */
+async function loadResults(){
+  const el = document.getElementById('results-view');
+  if (!votesUrlReady()){
+    el.innerHTML = `<div class="msg warn"><b>Not connected yet.</b> Paste <code>VOTES_CSV_URL</code> into the CONFIG block at the top of index.html, then re-upload.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="center"><div class="spinner"></div><p>Tallying votes…</p></div>`;
+  try {
+    // Make sure we have item->category metadata for grouping.
+    if (!itemsLoaded && itemsUrlReady()){ try { await loadItems(); } catch(_){} }
+
+    const url = CONFIG.VOTES_CSV_URL + (CONFIG.VOTES_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rows = parseCSV(await res.text());
+    renderResults(tally(rows));
+  } catch (e){
+    el.innerHTML = `<div class="msg err"><b>Couldn't read the results.</b> Likely cause: the Votes tab isn't published to the web as CSV yet, or the Votes CSV URL is wrong.<br><span class="note" style="color:#ffd2d6">(${esc(e.message)})</span></div>`;
+  }
+}
+
+/* Dedup by name (latest submission wins), then count votes per item.
+   Each submission shares ONE timestamp, so a voter's "latest batch" is the
+   set of rows carrying their max timestamp. */
+function tally(rows){
+  const byName = {}; // lcName -> { display, batches: { tsRaw -> {tsNum, order, items:Set} } }
+  let order = 0;
+  rows.forEach(r => {
+    if (!r || r.length < 3) return;
+    const tsRaw = String(r[0] || '').trim();
+    const name  = String(r[1] || '').trim();
+    const item  = String(r[2] || '').trim();
+    if (!name || !item) return;
+    if (name.toLowerCase() === 'name' && item.toLowerCase() === 'item') return; // header
+    const key = name.toLowerCase();
+    const voter = byName[key] || (byName[key] = { display: name, batches: {} });
+    const b = voter.batches[tsRaw] || (voter.batches[tsRaw] = { tsNum: Date.parse(tsRaw), order: order, items: new Set() });
+    b.items.add(item);
+    order++;
+  });
+
+  const counts = {};
+  let uniqueVoters = 0;
+  const voterNames = [];
+  Object.keys(byName).forEach(key => {
+    const voter = byName[key];
+    let chosen = null;
+    Object.keys(voter.batches).forEach(ts => {
+      const b = voter.batches[ts];
+      if (!chosen){ chosen = b; return; }
+      const bNaN = isNaN(b.tsNum), cNaN = isNaN(chosen.tsNum);
+      if (!bNaN && !cNaN){ if (b.tsNum > chosen.tsNum) chosen = b; }
+      else if (!bNaN && cNaN){ chosen = b; }              // real timestamp beats unparseable
+      else if (bNaN && cNaN){ if (b.order > chosen.order) chosen = b; } // both bad -> later row
+    });
+    if (chosen && chosen.items.size){
+      uniqueVoters++;
+      voterNames.push(voter.display);
+      chosen.items.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+    }
+  });
+  return { counts, uniqueVoters, voterNames };
+}
+
+function renderResults(data){
+  const el = document.getElementById('results-view');
+  const { counts, uniqueVoters, voterNames } = data;
+  const distinctItems = Object.keys(counts).length;
+  let totalVotes = 0; Object.keys(counts).forEach(k => totalVotes += counts[k]);
+
+  let h = `<div class="statrow">
+      <div class="statcard"><div class="statnum">${uniqueVoters}</div><div class="statlbl">Crew voted</div></div>
+      <div class="statcard"><div class="statnum">${distinctItems}</div><div class="statlbl">Snacks picked</div></div>
+      <div class="statcard"><div class="statnum">${totalVotes}</div><div class="statlbl">Total votes</div></div>
+    </div>
+    <div class="toolbar"><button id="refreshBtn" class="btn" type="button">Refresh</button></div>
+    <p class="note">Results refresh from Google every few minutes — not instant.</p>`;
+
+  if (uniqueVoters === 0){
+    h += `<div class="msg warn">No votes yet. Share the link and they'll show up here.</div>`;
+    el.innerHTML = h;
+    document.getElementById('refreshBtn').addEventListener('click', loadResults);
+    return;
+  }
+
+  const max = Math.max.apply(null, Object.values(counts));
+
+  // Group ranked results by category (using Items metadata, first-seen order).
+  // Voted items not found in the current ballot fall under "Other".
+  const used = {};
+  const groups = CATEGORY_ORDER.slice();
+  groups.forEach(cat => {
+    const ranked = Object.keys(counts)
+      .filter(item => (ITEM_META[item.toLowerCase()] || {}).category === cat)
+      .map(item => ({ item, ct: counts[item], meta: ITEM_META[item.toLowerCase()] }))
+      .sort((a, b) => b.ct - a.ct);
+    ranked.forEach(x => used[x.item.toLowerCase()] = true);
+    if (!ranked.length) return;
+    h += renderRankBlock(cat, ranked, max, uniqueVoters);
+  });
+  const leftovers = Object.keys(counts)
+    .filter(item => !used[item.toLowerCase()])
+    .map(item => ({ item, ct: counts[item], meta: ITEM_META[item.toLowerCase()] }))
+    .sort((a, b) => b.ct - a.ct);
+  if (leftovers.length) h += renderRankBlock("Other / write-ins", leftovers, max, uniqueVoters);
+
+  // Roll call
+  h += `<div class="cat"><div class="catname">Who's voted</div><div style="margin-top:10px">`;
+  voterNames.sort((a,b)=>a.localeCompare(b)).forEach(n => h += `<span class="chip" style="display:inline-block;font-size:12.5px;background:var(--steel);color:#cfd3da;padding:5px 11px;border-radius:20px;margin:3px 4px 0 0">${esc(n)}</span>`);
+  h += `</div></div>`;
+
+  el.innerHTML = h;
+  document.getElementById('refreshBtn').addEventListener('click', loadResults);
+}
+
+function renderRankBlock(title, ranked, max, voters){
+  let h = `<div class="cat"><div class="catname">${esc(title)}</div>`;
+  ranked.forEach((x, i) => {
+    const pct = max ? Math.round((x.ct / max) * 100) : 0;
+    const share = voters ? Math.round((x.ct / voters) * 100) : 0;
+    const m = x.meta || {};
+    const badges = (m.pp ? ' 🟢' : '') + (m.melt ? ' 🫠' : '');
+    const crown = i === 0 ? '★ ' : '';
+    h += `<div class="row">
+        <div class="rowtop"><span class="rname">${crown}${esc(x.item)}${badges}</span>
+        <span class="rct">${x.ct} · ${share}%</span></div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+      </div>`;
+  });
+  h += `</div>`;
+  return h;
+}
+
+/* ============================================================================
+   BUDGET VIEW  (top 3 per section + a weekly shopping planner)
+   ============================================================================ */
+async function loadBudget(){
+  const el = document.getElementById('budget-view');
+  if (!votesUrlReady() || !itemsUrlReady()){
+    el.innerHTML = `<div class="msg warn">Connect the Items and Votes CSV URLs first (see README) to build a budget.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="center"><div class="spinner"></div><p>Crunching the numbers…</p></div>`;
+  try {
+    if (!itemsLoaded){ await loadItems(); }
+    const url = CONFIG.VOTES_CSV_URL + (CONFIG.VOTES_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    window._budgetCounts = tally(parseCSV(await res.text())).counts;
+    renderBudget();
+  } catch (e){
+    el.innerHTML = `<div class="msg err">Couldn't load data for the budget.<br><span class="note" style="color:#ffd2d6">(${esc(e.message)})</span></div>`;
+  }
+}
+
+/* Top 3 voted items in each section (only items that actually got votes). */
+function topThreePerSection(counts){
+  const out = [];
+  CATEGORY_ORDER.forEach(cat => {
+    const ranked = ITEMS.filter(it => it.category === cat)
+      .map(it => ({ item: it.item, ct: counts[it.item] || 0, meta: it }))
+      .filter(x => x.ct > 0)
+      .sort((a, b) => b.ct - a.ct)
+      .slice(0, 3);
+    if (ranked.length) out.push({ section: cat, items: ranked });
+  });
+  return out;
+}
+
+/* Seed suggested pack quantities: split the weekly serving target across the
+   winners in proportion to their votes, then round up to whole packs. */
+function seedPlan(groups, targetServings){
+  const winners = [];
+  groups.forEach(g => g.items.forEach(x => winners.push(x)));
+  const totalVotes = winners.reduce((s, x) => s + x.ct, 0) || 1;
+  const q = {};
+  winners.forEach(x => {
+    const serv = x.meta.servings, price = x.meta.price;
+    if (!serv || price == null){ q[x.item] = 0; return; }
+    const alloc = targetServings * (x.ct / totalVotes);
+    q[x.item] = Math.max(1, Math.ceil(alloc / serv));
+  });
+  return q;
+}
+
+function renderBudget(){
+  const el = document.getElementById('budget-view');
+  const counts = window._budgetCounts || {};
+  const groups = topThreePerSection(counts);
+  const target = (budgetCfg.people || 0) * (budgetCfg.perPerson || 0) * (budgetCfg.days || 0);
+
+  if (!planSeeded){ planQty = seedPlan(groups, target); planSeeded = true; }
+
+  let h = `<div class="bgrid">
+      ${numField('People / day', 'b-people', budgetCfg.people)}
+      ${numField('Snacks / person / day', 'b-per', budgetCfg.perPerson)}
+      ${numField('Days / week', 'b-days', budgetCfg.days)}
+      ${numField('Weekly budget ($)', 'b-week', budgetCfg.weekly)}
+    </div>
+    <div class="toolbar">
+      <button id="b-suggest" class="btn" type="button">Suggest qty</button>
+      <button id="b-refresh" class="btn" type="button">Refresh votes</button>
+      <button id="b-copy" class="btn" type="button">Copy list</button>
+    </div>
+    <p class="note">Target this week: <b>${target}</b> servings (${budgetCfg.people} people × ${budgetCfg.perPerson} snacks × ${budgetCfg.days} days). Quantities are in <b>packs</b>; tweak any of them.</p>`;
+
+  if (!groups.length){
+    h += `<div class="msg warn">No votes yet, so there are no section winners to budget. Once the crew votes, the top 3 per section show up here.</div>`;
+    el.innerHTML = h; wireBudget(); return;
+  }
+
+  let total = 0, plannedServings = 0, missingPrice = 0;
+  groups.forEach(g => {
+    h += `<div class="cat"><div class="catname">${esc(g.section)}<span class="catcount">top ${g.items.length}</span></div>`;
+    g.items.forEach(x => {
+      const price = x.meta.price, serv = x.meta.servings, qty = planQty[x.item] || 0;
+      const priced = (price != null && serv != null && serv > 0);
+      if (!priced) missingPrice++;
+      const line = priced ? price * qty : null;
+      if (line != null){ total += line; plannedServings += qty * serv; }
+      const cps = priced ? (price / serv) : null;
+      const metaTxt = x.ct + ' vote' + (x.ct === 1 ? '' : 's')
+        + (price != null ? ' · $' + price.toFixed(2) + '/pack' : ' · no price')
+        + (serv ? ' · ' + serv + '/pack' : '')
+        + (cps != null ? ' · $' + cps.toFixed(2) + '/serving' : '');
+      h += `<div class="brow">
+          <div class="binfo"><div class="bname">${esc(x.item)} ${x.meta.pp ? '🟢' : ''}${x.meta.melt ? '🫠' : ''}</div>
+            <div class="bmeta">${metaTxt}</div></div>
+          <div class="bqty">
+            <button class="qbtn" type="button" data-item="${esc(x.item)}" data-d="-1">–</button>
+            <input class="qin" inputmode="numeric" data-item="${esc(x.item)}" value="${qty}">
+            <button class="qbtn" type="button" data-item="${esc(x.item)}" data-d="1">+</button>
+          </div>
+          <div class="bcost">${line != null ? '$' + line.toFixed(2) : '—'}</div>
+        </div>`;
+    });
+    h += `</div>`;
+  });
+
+  const weekly = budgetCfg.weekly || 0;
+  const pct = weekly ? Math.min(100, Math.round((total / weekly) * 100)) : 0;
+  const over = total > weekly;
+  h += `<div class="bsum">
+      <div class="bbar"><div class="bbarfill ${over ? 'over' : ''}" style="width:${pct}%"></div></div>
+      <div class="bsumrow"><span>Planned weekly cost</span><strong class="${over ? 'red' : ''}">$${total.toFixed(2)}</strong></div>
+      <div class="bsumrow"><span>Weekly budget</span><strong>$${weekly.toFixed(2)}</strong></div>
+      <div class="bsumrow"><span>${over ? 'Over budget by' : 'Remaining'}</span><strong class="${over ? 'red' : 'green'}">$${Math.abs(weekly - total).toFixed(2)}</strong></div>
+      <div class="bsumrow"><span>Servings planned vs target</span><strong>${plannedServings} / ${target}</strong></div>
+      ${missingPrice ? `<p class="note">${missingPrice} winning item(s) have no Price/Servings yet — add them in the Items tab to include them.</p>` : ''}
+      <p class="note">Prices come from the Items tab and are estimates — verify at your store.</p>
+    </div>`;
+  el.innerHTML = h;
+  wireBudget();
+}
+
+function numField(label, id, val){
+  return `<label class="bfield"><span>${label}</span><input id="${id}" class="bnum" inputmode="numeric" value="${val}"></label>`;
+}
+function wireBudget(){
+  const map = { 'b-people':'people', 'b-per':'perPerson', 'b-days':'days', 'b-week':'weekly' };
+  Object.keys(map).forEach(id => {
+    const elx = document.getElementById(id);
+    if (elx) elx.addEventListener('change', () => { budgetCfg[map[id]] = Math.max(0, num(elx.value) || 0); renderBudget(); });
+  });
+  const sg = document.getElementById('b-suggest'); if (sg) sg.addEventListener('click', () => { planSeeded = false; renderBudget(); });
+  const rf = document.getElementById('b-refresh'); if (rf) rf.addEventListener('click', loadBudget);
+  const cp = document.getElementById('b-copy'); if (cp) cp.addEventListener('click', copyShoppingList);
+  document.querySelectorAll('.qbtn').forEach(b => b.addEventListener('click',
+    () => adjustQty(b.getAttribute('data-item'), parseInt(b.getAttribute('data-d'), 10))));
+  document.querySelectorAll('.qin').forEach(inp => inp.addEventListener('change',
+    () => { planQty[inp.getAttribute('data-item')] = Math.max(0, parseInt(inp.value, 10) || 0); renderBudget(); }));
+}
+function adjustQty(item, d){ planQty[item] = Math.max(0, (planQty[item] || 0) + d); renderBudget(); }
+
+function copyShoppingList(){
+  const groups = topThreePerSection(window._budgetCounts || {});
+  const lines = ['FIREHOUSE SNACK SHOPPING LIST',
+    '(' + budgetCfg.people + ' people/day x ' + budgetCfg.perPerson + ' snacks x ' + budgetCfg.days + ' days)', ''];
+  let total = 0;
+  groups.forEach(g => {
+    lines.push('[' + g.section + ']');
+    g.items.forEach(x => {
+      const qty = planQty[x.item] || 0, price = x.meta.price;
+      const cost = (price != null) ? price * qty : null;
+      if (cost != null) total += cost;
+      lines.push('  ' + qty + ' x ' + x.item + (price != null ? '  @ $' + price.toFixed(2) + ' = $' + cost.toFixed(2) : '  (no price)'));
+    });
+    lines.push('');
+  });
+  lines.push('TOTAL: $' + total.toFixed(2) + '  /  budget $' + Number(budgetCfg.weekly).toFixed(2));
+  const text = lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(() => showToast('Shopping list copied'), () => downloadText(text));
+  } else downloadText(text);
+}
+function downloadText(text){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  a.download = 'snack-shopping-list.txt'; a.click();
+}
+
+/* ============================================================================
+   UTILITIES
+   ============================================================================ */
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ============================================================================
+   BOOT
+   ============================================================================ */
+(function boot(){
+  const missing = [];
+  if (!scriptReady())   missing.push("SCRIPT_URL");
+  if (!itemsUrlReady()) missing.push("ITEMS_CSV_URL");
+  if (!votesUrlReady()) missing.push("VOTES_CSV_URL");
+  if (missing.length){
+    document.getElementById('banner').innerHTML =
+      `<div class="msg warn"><b>Setup not finished.</b> Still need: ${missing.join(', ')}. Paste them into the CONFIG block at the top of index.html, then re-upload. See README.md.</div>`;
+  }
+  initVote();
+})();
+</script>
+</body>
+</html>
