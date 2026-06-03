@@ -188,7 +188,8 @@ body{
 const CONFIG = {
   SCRIPT_URL:    "https://script.google.com/macros/s/AKfycbzHCt5URYTHvivzAvxS4_MVcZfcapBvkV7uC34diQ7LKW5Pesollxb7FjSV4IuLflQJeg/exec", // votes POST here
   ITEMS_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=0&single=true&output=csv",
-  VOTES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=1318533049&single=true&output=csv"
+  VOTES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=1318533049&single=true&output=csv",
+  WRITEINS_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=1005354348&single=true&output=csv" // powers the live "Write-In Buzz" board on Results
 };
 /* ========================================================================== */
 
@@ -217,6 +218,7 @@ function isSet(url){ return url && url.indexOf("PASTE_") === -1; }
 function scriptReady(){ return isSet(CONFIG.SCRIPT_URL); }
 function itemsUrlReady(){ return isSet(CONFIG.ITEMS_CSV_URL); }
 function votesUrlReady(){ return isSet(CONFIG.VOTES_CSV_URL); }
+function writeinsUrlReady(){ return isSet(CONFIG.WRITEINS_CSV_URL); }
 
 /* ============================================================================
    CSV PARSER  (inline, no library — survives a CDN outage)
@@ -509,8 +511,18 @@ async function loadResults(){
     const url = CONFIG.VOTES_CSV_URL + (CONFIG.VOTES_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
-    const rows = parseCSV(await res.text());
-    renderResults(tally(rows));
+    const data = tally(parseCSV(await res.text()));
+
+    // Optional: live "Write-In Buzz" from the WriteIns tab (if published + configured).
+    let buzz = [];
+    if (writeinsUrlReady()){
+      try {
+        const wurl = CONFIG.WRITEINS_CSV_URL + (CONFIG.WRITEINS_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+        const wres = await fetch(wurl, { cache: "no-store" });
+        if (wres.ok) buzz = tallyWriteins(parseCSV(await wres.text()));
+      } catch (_){ /* buzz is a nice-to-have; ignore failures */ }
+    }
+    renderResults(data, buzz);
   } catch (e){
     el.innerHTML = `<div class="msg err"><b>Couldn't read the results.</b> Likely cause: the Votes tab isn't published to the web as CSV yet, or the Votes CSV URL is wrong.<br><span class="note" style="color:#ffd2d6">(${esc(e.message)})</span></div>`;
   }
@@ -559,7 +571,57 @@ function tally(rows){
   return { counts, uniqueVoters, voterNames };
 }
 
-function renderResults(data){
+/* Count this week's write-ins by how many DIFFERENT people asked for each thing.
+   Only un-promoted rows (blank Status) count — Monday's job stamps Status, which
+   also resets the buzz for the new week. One person = one mention per suggestion. */
+function tallyWriteins(rows){
+  if (!rows || !rows.length) return [];
+  const idx = headerIndex(rows[0]);
+  const cName = idx['name'], cSug = idx['suggestion'], cStat = idx['status'];
+  if (cName == null || cSug == null) return [];
+
+  const people = {};   // suggestionKey -> Set(personKey)
+  const display = {};  // suggestionKey -> first-seen original text
+  for (let i = 1; i < rows.length; i++){
+    const r = rows[i];
+    const status = cStat == null ? '' : String(r[cStat] == null ? '' : r[cStat]).trim();
+    if (status) continue; // already promoted in a past week
+    const name = String(r[cName] == null ? '' : r[cName]).trim();
+    const sug  = String(r[cSug]  == null ? '' : r[cSug]).trim();
+    if (!name || !sug) continue;
+    sug.split(/[\r\n]+/).map(s => s.trim()).filter(Boolean).forEach(p => {
+      const key = p.toLowerCase().replace(/\s+/g, ' ');
+      if (!display[key]) display[key] = p;
+      (people[key] || (people[key] = new Set())).add(name.toLowerCase());
+    });
+  }
+  return Object.keys(people).map(key => ({
+    text: display[key],
+    count: people[key].size,
+    onBallot: !!ITEM_META[key]
+  })).sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
+}
+
+/* Render the Write-In Buzz block (shared by both results paths). */
+function renderBuzzBlock(buzz){
+  if (!buzz || !buzz.length) return '';
+  const bmax = buzz[0].count;
+  let h = `<div class="cat"><div class="catname">Write-In Buzz<span class="catcount">this week</span></div>
+      <p class="note">What the crew keeps asking for. ★ = 3+ people — promoting to the ballot Monday.</p>`;
+  buzz.forEach(b => {
+    const pct = bmax ? Math.round((b.count / bmax) * 100) : 0;
+    const star = b.count >= 3 ? '★ ' : '';
+    const tag = b.onBallot ? ' (already on ballot)' : '';
+    h += `<div class="row">
+        <div class="rowtop"><span class="rname">${star}${esc(b.text)}${tag}</span>
+        <span class="rct">${b.count} ${b.count === 1 ? 'mention' : 'mentions'}</span></div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+      </div>`;
+  });
+  return h + `</div>`;
+}
+
+function renderResults(data, buzz){
   const el = document.getElementById('results-view');
   const { counts, uniqueVoters, voterNames } = data;
   const distinctItems = Object.keys(counts).length;
@@ -575,6 +637,7 @@ function renderResults(data){
 
   if (uniqueVoters === 0){
     h += `<div class="msg warn">No votes yet. Share the link and they'll show up here.</div>`;
+    h += renderBuzzBlock(buzz);   // buzz can exist before any formal votes
     el.innerHTML = h;
     document.getElementById('refreshBtn').addEventListener('click', loadResults);
     return;
@@ -600,6 +663,9 @@ function renderResults(data){
     .map(item => ({ item, ct: counts[item], meta: ITEM_META[item.toLowerCase()] }))
     .sort((a, b) => b.ct - a.ct);
   if (leftovers.length) h += renderRankBlock("Other / write-ins", leftovers, max, uniqueVoters);
+
+  // Live write-in buzz (this week's suggestions, before Monday's promotion)
+  h += renderBuzzBlock(buzz);
 
   // Roll call
   h += `<div class="cat"><div class="catname">Who's voted</div><div style="margin-top:10px">`;
