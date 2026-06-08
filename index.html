@@ -155,6 +155,37 @@ body{
 .bsumrow strong{font-family:'Oswald';font-size:18px;color:var(--cream);}
 .green{color:var(--good)!important;}
 .red{color:#ff6b73!important;}
+/* ---- receipts ---- */
+.drop{border:2px dashed var(--line);border-radius:12px;background:var(--char2);padding:26px 18px;text-align:center;
+  margin:16px 0 4px;transition:.15s;cursor:pointer;}
+.drop:hover,.drop.over{border-color:var(--amber);background:#20232a;}
+.drop .big{font-family:'Oswald';font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:1px;color:var(--cream);}
+.drop .sm{font-size:12.5px;color:var(--mut);margin-top:6px;line-height:1.5;}
+.preview{display:flex;gap:12px;align-items:flex-start;margin:14px 0;flex-wrap:wrap;}
+.preview img{max-width:160px;max-height:220px;border-radius:10px;border:2px solid var(--line);object-fit:cover;}
+.ocrbar{flex:1;min-width:200px;}
+.ocrbar .bar{height:10px;background:var(--steel);border-radius:6px;overflow:hidden;margin:8px 0;}
+.rtable{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px;}
+.rtable th{font-family:'Oswald';font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:1px;
+  color:var(--mut);text-align:left;padding:6px 6px;border-bottom:2px solid var(--line);}
+.rtable td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle;}
+.rtable input,.rtable select{width:100%;padding:8px 8px;font-family:'Archivo';font-size:14px;background:var(--char);
+  border:2px solid var(--line);border-radius:8px;color:var(--cream);outline:none;}
+.rtable input:focus,.rtable select:focus{border-color:var(--amber);}
+.rtable td.qtycol input,.rtable td.pricecol input{text-align:right;}
+.rtable td.xcol{width:34px;text-align:center;}
+.xbtn{width:28px;height:28px;border-radius:7px;border:2px solid var(--line);background:var(--char2);color:#ff9aa0;
+  font-size:15px;font-weight:700;cursor:pointer;line-height:1;}
+.xbtn:hover{border-color:var(--red);}
+.rmeta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin:14px 0 6px;}
+.report{background:var(--char2);border:2px solid var(--line);border-radius:12px;padding:16px;margin-top:16px;}
+.report h3{font-family:'Oswald';font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1px;
+  color:var(--amber);margin-bottom:4px;}
+.report .rsec{font-family:'Oswald';font-weight:600;font-size:13px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--cream);margin:12px 0 4px;border-bottom:1px solid var(--line);padding-bottom:4px;}
+.report .rln{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:3px 0;color:#c4c9d1;}
+.report .rtot{display:flex;justify-content:space-between;font-family:'Oswald';font-weight:700;font-size:16px;
+  color:var(--cream);margin-top:12px;border-top:2px solid var(--line);padding-top:10px;}
 </style>
 </head>
 <body>
@@ -162,7 +193,7 @@ body{
 <div class="head"><div class="headwrap">
   <div class="kicker">Crew Snack Vote</div>
   <div class="title">Firehouse Snack Vote</div>
-  <div class="sub">Pick up to <strong>3 per section</strong>. Badges: <strong>🟢 pocket-proof</strong> (survives your turnouts) and <strong>🫠 melts</strong> in the heat. No account needed.</div>
+  <div class="sub">Pick up to <strong>3 per section</strong>. Badges: <strong>🟢 pocket-proof</strong> (survives your turnouts), <strong>🫠 melts</strong> in the heat, and <strong>🛒 bought last week</strong>. No account needed.</div>
 </div></div>
 <div class="hazard"></div>
 
@@ -172,10 +203,12 @@ body{
     <button id="tab-vote" class="tab on" type="button">Vote</button>
     <button id="tab-results" class="tab" type="button">Results</button>
     <button id="tab-budget" class="tab" type="button">Budget</button>
+    <button id="tab-receipts" class="tab" type="button">Receipts</button>
   </div>
   <div id="vote-view"></div>
   <div id="results-view" class="hide"></div>
   <div id="budget-view" class="hide"></div>
+  <div id="receipts-view" class="hide"></div>
 </div>
 
 <div id="toast" class="toast">Vote submitted</div>
@@ -186,10 +219,11 @@ body{
    See README.md for exactly where each one comes from.
    ============================================================================ */
 const CONFIG = {
-  SCRIPT_URL:    "https://script.google.com/macros/s/AKfycbzHCt5URYTHvivzAvxS4_MVcZfcapBvkV7uC34diQ7LKW5Pesollxb7FjSV4IuLflQJeg/exec", // votes POST here
+  SCRIPT_URL:    "https://script.google.com/macros/s/AKfycbzHCt5URYTHvivzAvxS4_MVcZfcapBvkV7uC34diQ7LKW5Pesollxb7FjSV4IuLflQJeg/exec", // votes + receipts POST here
   ITEMS_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=0&single=true&output=csv",
   VOTES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=1318533049&single=true&output=csv",
-  WRITEINS_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=1005354348&single=true&output=csv" // powers the live "Write-In Buzz" board on Results
+  WRITEINS_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTd0SgxxSNZv02BA8skGGH4k6vckMumj_a8uFp5qO3Ks5-vSWj6SrnpGP4rzK3ez6tKydmQFU8-PfO9/pub?gid=1005354348&single=true&output=csv", // powers the live "Write-In Buzz" board on Results
+  PURCHASES_CSV_URL: "PASTE_PURCHASES_CSV_URL" // Receipts tab logs here; powers the 🛒 "bought last week" badge. See README.
 };
 /* ========================================================================== */
 
@@ -213,12 +247,27 @@ let budgetCfg = { people: 55, perPerson: 2, days: 7, weekly: 850 };
 let planQty = {};        // winning item -> packs to buy
 let planSeeded = false;  // seed suggested quantities once
 
+let LAST_WEEK_ITEMS = {}; // lowercased item -> true (purchased during the previous calendar week)
+let purchasesLoaded = false;
+
+/* ---------- receipt (Receipts tab) state ---------- */
+let rcLines = [];        // [{item, qty, price, category}] — editable review rows
+let rcDate = "";         // purchase date (yyyy-mm-dd)
+let rcStore = "";        // optional store label
+let rcPhotoName = "";    // file name of the scanned photo (for the log)
+let rcStatus = "";       // OCR progress / status message
+let rcBusy = false;      // OCR running
+let rcSubmitting = false;
+let rcDone = false;      // a receipt was just submitted (show confirmation)
+let tesseractPromise = null;
+
 /* ---------- tiny config guards ---------- */
 function isSet(url){ return url && url.indexOf("PASTE_") === -1; }
 function scriptReady(){ return isSet(CONFIG.SCRIPT_URL); }
 function itemsUrlReady(){ return isSet(CONFIG.ITEMS_CSV_URL); }
 function votesUrlReady(){ return isSet(CONFIG.VOTES_CSV_URL); }
 function writeinsUrlReady(){ return isSet(CONFIG.WRITEINS_CSV_URL); }
+function purchasesUrlReady(){ return isSet(CONFIG.PURCHASES_CSV_URL); }
 
 /* ============================================================================
    CSV PARSER  (inline, no library — survives a CDN outage)
@@ -318,19 +367,74 @@ function loadItems(force){
 }
 
 /* ============================================================================
+   PURCHASES  (drives the 🛒 "bought last week" badge on the ballot)
+   Reads the Purchases tab — one row per bought line item, with a date.
+   ============================================================================ */
+/* Monday-00:00 (local) of the week containing date d. */
+function weekStart(d){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = (x.getDay() + 6) % 7; // Mon=0 … Sun=6
+  x.setDate(x.getDate() - dow);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+/* The half-open range [start, end) covering the PREVIOUS calendar week. */
+function lastWeekRange(now){
+  const thisStart = weekStart(now || new Date());
+  const lastStart = new Date(thisStart); lastStart.setDate(lastStart.getDate() - 7);
+  return { start: lastStart, end: thisStart };
+}
+/* Tolerant date parse for receipt dates: ISO (yyyy-mm-dd), or m/d/yyyy. */
+function parseDate(v){
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m){ let y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[1] - 1, +m[2]); }
+  const t = Date.parse(s);
+  return isNaN(t) ? null : new Date(t);
+}
+
+function loadPurchases(){
+  if (!purchasesUrlReady()) return Promise.resolve();
+  return (async () => {
+    const url = CONFIG.PURCHASES_CSV_URL + (CONFIG.PURCHASES_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rows = parseCSV(await res.text()).filter(r => r.length && r.some(c => String(c).trim() !== ""));
+    if (!rows.length){ LAST_WEEK_ITEMS = {}; purchasesLoaded = true; return; }
+    const h = headerIndex(rows[0]);
+    const cDate = h["date"], cItem = h["item"];
+    const range = lastWeekRange(new Date());
+    const set = {};
+    for (let i = 1; i < rows.length; i++){
+      const r = rows[i];
+      const item = String((cItem != null ? r[cItem] : r[1]) || '').trim();
+      const d = parseDate(cDate != null ? r[cDate] : r[0]);
+      if (!item || !d) continue;
+      if (d >= range.start && d < range.end) set[item.toLowerCase()] = true;
+    }
+    LAST_WEEK_ITEMS = set; purchasesLoaded = true;
+  })();
+}
+
+/* ============================================================================
    VIEW SWITCHING
    ============================================================================ */
 function setView(v){
-  ['vote','results','budget'].forEach(name => {
+  ['vote','results','budget','receipts'].forEach(name => {
     document.getElementById('tab-' + name).className = 'tab' + (v === name ? ' on' : '');
     document.getElementById(name + '-view').className = (v === name ? '' : 'hide');
   });
   if (v === 'results') loadResults();
   if (v === 'budget') loadBudget();
+  if (v === 'receipts') initReceipts();
 }
 document.getElementById('tab-vote').addEventListener('click', () => setView('vote'));
 document.getElementById('tab-results').addEventListener('click', () => setView('results'));
 document.getElementById('tab-budget').addEventListener('click', () => setView('budget'));
+document.getElementById('tab-receipts').addEventListener('click', () => setView('receipts'));
 
 /* ============================================================================
    VOTE VIEW
@@ -344,6 +448,8 @@ async function initVote(){
   el.innerHTML = `<div class="center"><div class="spinner"></div><p>Loading the ballot…</p></div>`;
   try {
     await loadItems(true);
+    // Bought-last-week badge is a nice-to-have — never block the ballot on it.
+    try { await loadPurchases(); } catch (_){ }
     renderVote();
   } catch (e){
     if (String(e.message) === "empty" || ITEMS.length === 0){
@@ -382,7 +488,8 @@ function renderVote(){
     list.forEach(it => {
       const on = !!selected[it.item];
       const lock = maxed && !on;
-      const badges = (it.pp ? '🟢' : '') + (it.melt ? '🫠' : '');
+      const lastWeek = !!LAST_WEEK_ITEMS[it.item.toLowerCase()];
+      const badges = (it.pp ? '🟢' : '') + (it.melt ? '🫠' : '') + (lastWeek ? '🛒' : '');
       h += `<button class="item${on ? ' sel' : ''}${lock ? ' lock' : ''}" type="button" data-item="${esc(it.item)}">
               <span class="check">${on ? '✓' : ''}</span>
               <span class="iname">${esc(it.item)}</span>
@@ -682,7 +789,7 @@ function renderRankBlock(title, ranked, max, voters){
     const pct = max ? Math.round((x.ct / max) * 100) : 0;
     const share = voters ? Math.round((x.ct / voters) * 100) : 0;
     const m = x.meta || {};
-    const badges = (m.pp ? ' 🟢' : '') + (m.melt ? ' 🫠' : '');
+    const badges = (m.pp ? ' 🟢' : '') + (m.melt ? ' 🫠' : '') + (LAST_WEEK_ITEMS[x.item.toLowerCase()] ? ' 🛒' : '');
     const crown = i === 0 ? '★ ' : '';
     h += `<div class="row">
         <div class="rowtop"><span class="rname">${crown}${esc(x.item)}${badges}</span>
@@ -860,6 +967,378 @@ function downloadText(text){
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
   a.download = 'snack-shopping-list.txt'; a.click();
+}
+
+/* ============================================================================
+   RECEIPTS VIEW  (photo -> on-device OCR -> review -> report -> log + ballot)
+   OCR runs in the browser via Tesseract.js (loaded from a CDN on first use).
+   Nothing leaves the device until you hit "Save receipt".
+   ============================================================================ */
+function todayISO(){
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+function initReceipts(){
+  if (!rcDate) rcDate = todayISO();
+  // Pull metadata so category suggestions match the existing ballot sections.
+  if (!itemsLoaded && itemsUrlReady()){ loadItems().catch(()=>{}).then(renderReceipts); }
+  renderReceipts();
+}
+
+function renderReceipts(){
+  const el = document.getElementById('receipts-view');
+
+  if (!scriptReady()){
+    el.innerHTML = `<div class="msg warn"><b>Not connected yet.</b> Receipts save through the same Google Apps Script as votes — paste <code>SCRIPT_URL</code> into the CONFIG block at the top of index.html (and add the receipt-handling code from the README), then re-upload.</div>`;
+    return;
+  }
+
+  let h = `<p class="note" style="margin-top:14px">Snap or upload a receipt. The app reads it on your phone, you fix anything that looks off, and saving logs what was bought, adds those items to the ballot with their prices, and tags them 🛒 <b>bought last week</b> for next week's vote.</p>`;
+
+  // Upload / capture zone
+  h += `<div id="rc-drop" class="drop">
+      <div class="big">📷 Tap to add a receipt photo</div>
+      <div class="sm">Take a photo or choose one from your library. JPG/PNG/HEIC.</div>
+      <input id="rc-file" type="file" accept="image/*" capture="environment" class="hide">
+    </div>`;
+
+  // Preview + OCR progress
+  if (rcPhotoName || rcBusy || rcStatus){
+    h += `<div class="preview">
+        <img id="rc-img" alt="receipt preview" class="${window._rcImgURL ? '' : 'hide'}" src="${window._rcImgURL || ''}">
+        <div class="ocrbar">
+          <div class="lbl">${rcBusy ? 'Reading receipt…' : 'Receipt'}</div>
+          <div class="bar"><div id="rc-prog" class="fill" style="width:${rcBusy ? '40' : '100'}%"></div></div>
+          <div id="rc-status" class="note">${esc(rcStatus || (rcPhotoName ? rcPhotoName : ''))}</div>
+        </div>
+      </div>`;
+  }
+
+  // Review table (only once we have/added lines)
+  if (rcLines.length){
+    h += `<div class="rmeta">
+        <label class="bfield"><span>Purchase date</span><input id="rc-date" class="bnum" type="date" value="${esc(rcDate)}"></label>
+        <label class="bfield"><span>Store (optional)</span><input id="rc-store" class="bnum" type="text" value="${esc(rcStore)}" placeholder="e.g. Costco"></label>
+      </div>
+      <div class="catname" style="margin-top:8px">Review what was bought<span class="catcount">${rcLines.length} item${rcLines.length===1?'':'s'}</span></div>
+      <p class="note">Fix any names/prices the scan got wrong. Qty × price ea. = line total. Category controls which ballot section the item joins.</p>
+      <table class="rtable"><thead><tr>
+        <th>Item</th><th style="width:64px">Qty</th><th style="width:84px">Price ea.</th><th style="width:33%">Category</th><th class="xcol"></th>
+      </tr></thead><tbody>`;
+    rcLines.forEach((l, i) => {
+      h += `<tr>
+          <td><input data-i="${i}" data-k="item" value="${esc(l.item)}" placeholder="Item name"></td>
+          <td class="qtycol"><input data-i="${i}" data-k="qty" inputmode="numeric" value="${esc(l.qty)}"></td>
+          <td class="pricecol"><input data-i="${i}" data-k="price" inputmode="decimal" value="${l.price === '' || l.price == null ? '' : esc(l.price)}"></td>
+          <td><input data-i="${i}" data-k="category" list="rc-cats" value="${esc(l.category)}" placeholder="Section"></td>
+          <td class="xcol"><button class="xbtn" type="button" data-x="${i}">×</button></td>
+        </tr>`;
+    });
+    h += `</tbody></table>`;
+    h += `<datalist id="rc-cats">${CATEGORY_ORDER.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
+    h += `<div class="toolbar"><button id="rc-add" class="btn" type="button">+ Add line</button></div>`;
+
+    // Report preview (live-updated as rows are edited)
+    h += `<div id="rc-report-slot">` + renderReceiptReportHTML() + `</div>`;
+
+    // Save / copy
+    h += `<div class="toolbar" style="margin-top:14px">
+        <button id="rc-copy" class="btn" type="button">Copy report</button>
+      </div>
+      <button id="rc-save" class="submit" type="button" ${rcSubmitting ? 'disabled' : ''}>${rcSubmitting ? 'Saving…' : 'Save receipt'}</button>
+      <p class="note" style="margin-bottom:90px">Saving logs every line to the Purchases tab and adds/updates these items (with prices) on the ballot. The 🛒 badge shows up on the vote next week.</p>`;
+  } else if (!rcBusy && rcDone){
+    h += `<div class="msg" style="background:#0e2b16;border:2px solid var(--good);color:#bfe9cc">
+        <b>Receipt saved.</b> The items are logged and on the ballot now. Add another, or head to the Budget tab.</div>
+      <div class="toolbar"><button id="rc-new" class="btn" type="button">+ Add another receipt</button></div>`;
+  } else if (!rcBusy){
+    h += `<p class="note">No receipt loaded yet. Add a photo above, or <button id="rc-manual" class="link" type="button">enter items by hand</button>.</p>`;
+  }
+
+  el.innerHTML = h;
+  wireReceipts();
+}
+
+function renderReceiptReportHTML(){
+  const r = computeReceiptReport();
+  if (!r.lines.length) return '';
+  let h = `<div class="report"><h3>Receipt report</h3>
+      <div class="note">${esc(rcStore || 'Purchase')}${rcDate ? ' · ' + esc(rcDate) : ''} · ${r.lines.length} item${r.lines.length===1?'':'s'}, ${r.totalQty} unit${r.totalQty===1?'':'s'}</div>`;
+  r.sections.forEach(sec => {
+    h += `<div class="rsec">${esc(sec.name)} — $${sec.total.toFixed(2)}</div>`;
+    sec.items.forEach(it => {
+      h += `<div class="rln"><span>${esc(it.qty)} × ${esc(it.item)}</span><span>${it.lineTotal != null ? '$' + it.lineTotal.toFixed(2) : '—'}</span></div>`;
+    });
+  });
+  h += `<div class="rtot"><span>Total</span><span>$${r.total.toFixed(2)}</span></div></div>`;
+  return h;
+}
+
+/* Group the (edited) lines by category and total them up. */
+function computeReceiptReport(){
+  const lines = rcLines
+    .map(l => {
+      const qty = Math.max(0, parseInt(l.qty, 10) || 0);
+      const price = (l.price === '' || l.price == null) ? null : (num(l.price));
+      const lineTotal = price != null ? qty * price : null;
+      return { item: String(l.item || '').trim(), qty, price, lineTotal, category: String(l.category || '').trim() || 'Other' };
+    })
+    .filter(l => l.item);
+  const order = [], byCat = {};
+  lines.forEach(l => { if (!byCat[l.category]){ byCat[l.category] = []; order.push(l.category); } byCat[l.category].push(l); });
+  let total = 0, totalQty = 0;
+  const sections = order.map(name => {
+    let st = 0;
+    byCat[name].forEach(l => { if (l.lineTotal != null) st += l.lineTotal; totalQty += l.qty; });
+    total += st;
+    return { name, items: byCat[name], total: st };
+  });
+  return { lines, sections, total, totalQty };
+}
+
+function buildReceiptReportText(){
+  const r = computeReceiptReport();
+  const out = ['FIREHOUSE RECEIPT — what was bought',
+    (rcStore ? rcStore + '  ' : '') + (rcDate || ''), ''];
+  r.sections.forEach(sec => {
+    out.push('[' + sec.name + ']  $' + sec.total.toFixed(2));
+    sec.items.forEach(it => {
+      out.push('  ' + it.qty + ' x ' + it.item +
+        (it.price != null ? '  @ $' + it.price.toFixed(2) + ' = $' + it.lineTotal.toFixed(2) : '  (no price)'));
+    });
+    out.push('');
+  });
+  out.push('TOTAL: $' + r.total.toFixed(2) + '  (' + r.totalQty + ' units)');
+  return out.join('\n');
+}
+
+function wireReceipts(){
+  const drop = document.getElementById('rc-drop');
+  const file = document.getElementById('rc-file');
+  if (drop && file){
+    drop.addEventListener('click', () => file.click());
+    file.addEventListener('change', () => { if (file.files && file.files[0]) handleReceiptFile(file.files[0]); });
+    ['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleReceiptFile(f); });
+  }
+  const man = document.getElementById('rc-manual');
+  if (man) man.addEventListener('click', () => { addRcRow(); });
+  const nw = document.getElementById('rc-new');
+  if (nw) nw.addEventListener('click', () => { resetReceipt(); renderReceipts(); });
+
+  const dt = document.getElementById('rc-date'); if (dt) dt.addEventListener('change', () => { rcDate = dt.value; });
+  const st = document.getElementById('rc-store'); if (st) st.addEventListener('input', () => { rcStore = st.value; });
+
+  document.querySelectorAll('.rtable input').forEach(inp => {
+    const handler = () => {
+      const i = +inp.getAttribute('data-i'), k = inp.getAttribute('data-k');
+      if (rcLines[i]){ rcLines[i][k] = inp.value; updateReportPreview(); }
+    };
+    inp.addEventListener('input', handler);
+  });
+  document.querySelectorAll('.xbtn').forEach(b => b.addEventListener('click', () => removeRcRow(+b.getAttribute('data-x'))));
+
+  const add = document.getElementById('rc-add'); if (add) add.addEventListener('click', () => addRcRow());
+  const copy = document.getElementById('rc-copy'); if (copy) copy.addEventListener('click', copyReceiptReport);
+  const save = document.getElementById('rc-save'); if (save) save.addEventListener('click', submitReceipt);
+}
+
+/* Re-render only the report block while typing, so inputs keep focus. */
+function updateReportPreview(){
+  const slot = document.getElementById('rc-report-slot');
+  if (slot) slot.innerHTML = renderReceiptReportHTML();
+}
+
+function addRcRow(){
+  rcLines.push({ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' });
+  renderReceipts();
+  // focus the new row's item input
+  const inputs = document.querySelectorAll('.rtable input[data-k="item"]');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+function removeRcRow(i){ rcLines.splice(i, 1); renderReceipts(); }
+function resetReceipt(){
+  rcLines = []; rcStore = ''; rcPhotoName = ''; rcStatus = ''; rcDone = false; rcBusy = false;
+  rcDate = todayISO();
+  if (window._rcImgURL){ try { URL.revokeObjectURL(window._rcImgURL); } catch(_){} window._rcImgURL = ''; }
+}
+
+/* ---- OCR ---- */
+function ensureTesseract(){
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (tesseractPromise) return tesseractPromise;
+  tesseractPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('Tesseract failed to load'));
+    s.onerror = () => reject(new Error('Could not load the OCR library (offline?)'));
+    document.head.appendChild(s);
+  });
+  return tesseractPromise;
+}
+
+async function handleReceiptFile(file){
+  if (!file || !/^image\//.test(file.type) && !/\.(jpe?g|png|heic|heif|webp)$/i.test(file.name || '')){
+    showToast('Please choose an image file');
+    return;
+  }
+  rcDone = false;
+  rcPhotoName = file.name || 'receipt.jpg';
+  if (window._rcImgURL){ try { URL.revokeObjectURL(window._rcImgURL); } catch(_){} }
+  window._rcImgURL = URL.createObjectURL(file);
+  rcBusy = true; rcStatus = 'Loading OCR…';
+  renderReceipts();
+
+  try {
+    const T = await ensureTesseract();
+    rcStatus = 'Reading receipt…'; setOcrProgress(0.1, rcStatus);
+    const { data } = await T.recognize(file, 'eng', {
+      logger: m => { if (m.status === 'recognizing text') setOcrProgress(m.progress, 'Reading receipt… ' + Math.round(m.progress * 100) + '%'); }
+    });
+    const lines = parseReceiptText(data && data.text ? data.text : '');
+    rcBusy = false;
+    if (lines.length){
+      rcLines = lines;
+      rcStatus = 'Read ' + lines.length + ' item' + (lines.length === 1 ? '' : 's') + ' — check them below.';
+    } else {
+      rcLines = [{ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' }];
+      rcStatus = "Couldn't pick out line items automatically — add them by hand below.";
+    }
+    renderReceipts();
+  } catch (e){
+    rcBusy = false;
+    rcStatus = 'OCR failed: ' + e.message + ' — you can still enter items by hand.';
+    if (!rcLines.length) rcLines = [{ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' }];
+    renderReceipts();
+  }
+}
+
+function setOcrProgress(p, msg){
+  const bar = document.getElementById('rc-prog');
+  const st = document.getElementById('rc-status');
+  if (bar) bar.style.width = Math.max(5, Math.round((p || 0) * 100)) + '%';
+  if (st && msg) st.textContent = msg;
+}
+
+/* Heuristic receipt parser. Pulls "<name> ... <price>" lines, drops the
+   subtotal/tax/total/payment noise, and guesses qty from "2 @"/"2 x" patterns.
+   Whatever it gets wrong, the review table lets the crew fix in seconds. */
+function parseReceiptText(text){
+  const SKIP = /\b(sub\s*total|subtotal|total|tax|hst|gst|pst|vat|balance|change|cash|debit|credit|visa|master|amex|tender|approved|auth|ref|aid|account|card|terminal|store|tel|phone|receipt|cashier|reg(ister)?|invoice|order|date|time|thank|welcome|member|points|savings|loyalty|qty)\b/i;
+  const out = [];
+  String(text || '').split(/\r?\n/).forEach(raw => {
+    let line = raw.replace(/\s+/g, ' ').trim();
+    if (line.length < 3) return;
+    // find a price near the end: 1.99 / 12.50 / $3.00 (allow trailing letters like T/F tax flags)
+    const pm = line.match(/(?:\$\s*)?(\d{1,4}[.,]\d{2})(?:\s*[A-Z]{1,2})?\s*$/);
+    if (!pm) return;
+    const lineTotal = parseFloat(pm[1].replace(',', '.'));
+    let name = line.slice(0, pm.index).trim();
+    // strip leading item codes / UPCs / leading symbols
+    name = name.replace(/^\d{5,}\s+/, '').replace(/^[#*]+\s*/, '').trim();
+    let qty = 1, unit = lineTotal;
+    // "N @ U.UU" anywhere → N units at unit price U; the trailing number is the line total
+    const at = name.match(/(\d{1,3})\s*@\s*\$?(\d{1,4}[.,]\d{2})/);
+    if (at){
+      qty = parseInt(at[1], 10) || 1;
+      unit = parseFloat(at[2].replace(',', '.'));
+      name = (name.slice(0, at.index) + ' ' + name.slice(at.index + at[0].length)).trim();
+    } else {
+      // leading quantity: "2 x Item", "2X Item", or "2 Item"
+      const qm = name.match(/^(\d{1,3})\s*[xX]\s+/) || name.match(/^(\d{1,3})\s+(?=[A-Za-z])/);
+      if (qm){
+        qty = parseInt(qm[1], 10) || 1;
+        name = name.slice(qm[0].length).trim();
+        if (qty > 1 && lineTotal / qty >= 0.25) unit = +(lineTotal / qty).toFixed(2); // split total into per-unit
+      }
+    }
+    name = name.replace(/[^A-Za-z0-9 &'./-]/g, '').replace(/\s+/g, ' ').trim();
+    if (!name || name.length < 2) return;
+    if (SKIP.test(line) || SKIP.test(name)) return;
+    if (!/[A-Za-z]/.test(name)) return;        // need at least some letters
+    if (unit <= 0 || unit > 999) return;
+    out.push({ item: titleCase(name), qty, price: unit, category: guessCategory(name) });
+  });
+  return out;
+}
+
+function titleCase(s){
+  return String(s).toLowerCase().replace(/\b([a-z])/g, c => c.toUpperCase());
+}
+
+/* Best-effort category guess: exact ballot match, then keyword buckets,
+   else the first existing section (or "Snacks"). Crew can override. */
+function guessCategory(name){
+  const key = String(name).toLowerCase();
+  const meta = ITEM_META[key];
+  if (meta && meta.category) return meta.category;
+  // partial match against known items
+  for (const k in ITEM_META){
+    if (k && (key.includes(k) || k.includes(key)) && k.length >= 4) return ITEM_META[k].category;
+  }
+  const buckets = [
+    [/(chip|crisp|pretzel|popcorn|cracker|nut|jerky|trail)/, 'Salty / Crunchy'],
+    [/(candy|chocolate|cookie|brownie|donut|granola|bar|sweet|gummy)/, 'Sweet'],
+    [/(soda|cola|pop|water|gatorade|juice|coffee|tea|drink|energy|monster|red bull)/, 'Drinks'],
+    [/(apple|banana|orange|grape|berry|fruit|veg|carrot|celery|yogurt|cheese|hummus)/, 'Fresh / Healthy'],
+  ];
+  for (const [re, cat] of buckets){
+    if (re.test(key)){
+      const existing = CATEGORY_ORDER.find(c => c.toLowerCase() === cat.toLowerCase());
+      return existing || CATEGORY_ORDER[0] || cat;
+    }
+  }
+  return CATEGORY_ORDER[0] || 'Snacks';
+}
+
+function copyReceiptReport(){
+  const text = buildReceiptReportText();
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(() => showToast('Report copied'), () => downloadText(text));
+  } else downloadText(text);
+}
+
+async function submitReceipt(){
+  if (rcSubmitting) return;
+  const r = computeReceiptReport();
+  if (!r.lines.length){ alert('Add at least one item first.'); return; }
+  if (!scriptReady()){ alert('Not connected to Google yet — paste SCRIPT_URL into the CONFIG block.'); return; }
+  if (!rcDate){ alert('Pick the purchase date.'); return; }
+
+  rcSubmitting = true; renderReceipts();
+  const payload = {
+    type: 'receipt',
+    date: rcDate,
+    store: rcStore.trim(),
+    photo: rcPhotoName,
+    total: +r.total.toFixed(2),
+    lines: r.lines.map(l => ({ item: l.item, qty: l.qty, price: l.price, category: l.category })),
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    await fetch(CONFIG.SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+  } catch (e){
+    rcSubmitting = false; renderReceipts();
+    alert("Couldn't reach Google — check your connection and try again.");
+    return;
+  }
+
+  showToast('Receipt saved — ' + r.lines.length + ' item' + (r.lines.length === 1 ? '' : 's') + ' logged');
+  rcSubmitting = false;
+  resetReceipt();
+  rcDone = true;
+  // Items list changed on the backend; drop our cache so the ballot reloads fresh.
+  itemsLoaded = false; itemsPromise = null;
+  renderReceipts();
 }
 
 /* ============================================================================
