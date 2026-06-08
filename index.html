@@ -162,7 +162,13 @@ body{
 .drop .big{font-family:'Oswald';font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:1px;color:var(--cream);}
 .drop .sm{font-size:12.5px;color:var(--mut);margin-top:6px;line-height:1.5;}
 .preview{display:flex;gap:12px;align-items:flex-start;margin:14px 0;flex-wrap:wrap;}
-.preview img{max-width:160px;max-height:220px;border-radius:10px;border:2px solid var(--line);object-fit:cover;}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;}
+.thumb{position:relative;}
+.thumb img{width:84px;height:112px;border-radius:10px;border:2px solid var(--line);object-fit:cover;display:block;}
+.thumbx{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:2px solid var(--char);
+  background:var(--red);color:#fff;font-size:13px;font-weight:700;line-height:1;cursor:pointer;}
+.thumbn{position:absolute;bottom:4px;left:4px;background:rgba(21,23,27,.85);color:var(--cream);font-size:11px;
+  font-family:'Oswald';font-weight:600;padding:1px 6px;border-radius:6px;}
 .ocrbar{flex:1;min-width:200px;}
 .ocrbar .bar{height:10px;background:var(--steel);border-radius:6px;overflow:hidden;margin:8px 0;}
 .rtable{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px;}
@@ -254,7 +260,7 @@ let purchasesLoaded = false;
 let rcLines = [];        // [{item, qty, price, category}] — editable review rows
 let rcDate = "";         // purchase date (yyyy-mm-dd)
 let rcStore = "";        // optional store label
-let rcPhotoName = "";    // file name of the scanned photo (for the log)
+let rcPhotos = [];       // [{name, url}] — one long receipt can span several photos
 let rcStatus = "";       // OCR progress / status message
 let rcBusy = false;      // OCR running
 let rcSubmitting = false;
@@ -998,20 +1004,27 @@ function renderReceipts(){
   let h = `<p class="note" style="margin-top:14px">Snap or upload a receipt. The app reads it on your phone, you fix anything that looks off, and saving logs what was bought, adds those items to the ballot with their prices, and tags them 🛒 <b>bought last week</b> for next week's vote.</p>`;
 
   // Upload / capture zone
+  const addMore = rcPhotos.length > 0;
   h += `<div id="rc-drop" class="drop">
-      <div class="big">📷 Tap to add a receipt photo</div>
-      <div class="sm">Take a photo or choose one from your library. JPG/PNG/HEIC.</div>
-      <input id="rc-file" type="file" accept="image/*" capture="environment" class="hide">
+      <div class="big">📷 ${addMore ? 'Add another photo (page ' + (rcPhotos.length + 1) + ')' : 'Tap to add a receipt photo'}</div>
+      <div class="sm">Long receipt? Add several photos top-to-bottom — overlap between them is removed automatically. You can pick more than one at once. JPG/PNG/HEIC.</div>
+      <input id="rc-file" type="file" accept="image/*" capture="environment" multiple class="hide">
     </div>`;
 
-  // Preview + OCR progress
-  if (rcPhotoName || rcBusy || rcStatus){
-    h += `<div class="preview">
-        <img id="rc-img" alt="receipt preview" class="${window._rcImgURL ? '' : 'hide'}" src="${window._rcImgURL || ''}">
-        <div class="ocrbar">
-          <div class="lbl">${rcBusy ? 'Reading receipt…' : 'Receipt'}</div>
+  // Photo strip + OCR progress
+  if (rcPhotos.length || rcBusy || rcStatus){
+    h += `<div class="preview">`;
+    if (rcPhotos.length){
+      h += `<div class="thumbs">`;
+      rcPhotos.forEach((p, i) => {
+        h += `<div class="thumb"><img src="${p.url}" alt="page ${i + 1}"><button class="thumbx" type="button" data-photo="${i}" title="Remove this photo">×</button><span class="thumbn">${i + 1}</span></div>`;
+      });
+      h += `</div>`;
+    }
+    h += `<div class="ocrbar">
+          <div class="lbl">${rcBusy ? 'Reading receipt…' : (rcPhotos.length > 1 ? rcPhotos.length + ' photos' : 'Receipt')}</div>
           <div class="bar"><div id="rc-prog" class="fill" style="width:${rcBusy ? '40' : '100'}%"></div></div>
-          <div id="rc-status" class="note">${esc(rcStatus || (rcPhotoName ? rcPhotoName : ''))}</div>
+          <div id="rc-status" class="note">${esc(rcStatus || '')}</div>
         </div>
       </div>`;
   }
@@ -1023,7 +1036,7 @@ function renderReceipts(){
         <label class="bfield"><span>Store (optional)</span><input id="rc-store" class="bnum" type="text" value="${esc(rcStore)}" placeholder="e.g. Costco"></label>
       </div>
       <div class="catname" style="margin-top:8px">Review what was bought<span class="catcount">${rcLines.length} item${rcLines.length===1?'':'s'}</span></div>
-      <p class="note">Fix any names/prices the scan got wrong. Qty × price ea. = line total. Category controls which ballot section the item joins.</p>
+      <p class="note">Fix any names/prices the scan got wrong. Qty × price ea. = line total. Category controls which ballot section the item joins.${rcPhotos.length > 1 ? ' <b>Multiple photos merged</b> — overlapping rows were removed, but double-check for any stragglers.' : ''}</p>
       <table class="rtable"><thead><tr>
         <th>Item</th><th style="width:64px">Qty</th><th style="width:84px">Price ea.</th><th style="width:33%">Category</th><th class="xcol"></th>
       </tr></thead><tbody>`;
@@ -1119,11 +1132,12 @@ function wireReceipts(){
   const file = document.getElementById('rc-file');
   if (drop && file){
     drop.addEventListener('click', () => file.click());
-    file.addEventListener('change', () => { if (file.files && file.files[0]) handleReceiptFile(file.files[0]); });
+    file.addEventListener('change', () => { if (file.files && file.files.length) handleReceiptFiles(file.files); });
     ['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
     ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-    drop.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleReceiptFile(f); });
+    drop.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files; if (f && f.length) handleReceiptFiles(f); });
   }
+  document.querySelectorAll('.thumbx').forEach(b => b.addEventListener('click', () => removeReceiptPhoto(+b.getAttribute('data-photo'))));
   const man = document.getElementById('rc-manual');
   if (man) man.addEventListener('click', () => { addRcRow(); });
   const nw = document.getElementById('rc-new');
@@ -1160,10 +1174,18 @@ function addRcRow(){
   if (inputs.length) inputs[inputs.length - 1].focus();
 }
 function removeRcRow(i){ rcLines.splice(i, 1); renderReceipts(); }
+function removeReceiptPhoto(i){
+  const p = rcPhotos[i];
+  if (p && p.url){ try { URL.revokeObjectURL(p.url); } catch(_){} }
+  rcPhotos.splice(i, 1);
+  // Lines already parsed from this photo stay in the table — fix them there.
+  renderReceipts();
+}
 function resetReceipt(){
-  rcLines = []; rcStore = ''; rcPhotoName = ''; rcStatus = ''; rcDone = false; rcBusy = false;
+  rcLines = []; rcStore = ''; rcStatus = ''; rcDone = false; rcBusy = false;
   rcDate = todayISO();
-  if (window._rcImgURL){ try { URL.revokeObjectURL(window._rcImgURL); } catch(_){} window._rcImgURL = ''; }
+  rcPhotos.forEach(p => { if (p.url){ try { URL.revokeObjectURL(p.url); } catch(_){} } });
+  rcPhotos = [];
 }
 
 /* ---- OCR ---- */
@@ -1180,40 +1202,90 @@ function ensureTesseract(){
   return tesseractPromise;
 }
 
-async function handleReceiptFile(file){
-  if (!file || !/^image\//.test(file.type) && !/\.(jpe?g|png|heic|heif|webp)$/i.test(file.name || '')){
-    showToast('Please choose an image file');
-    return;
-  }
+function isImageFile(f){
+  return f && (/^image\//.test(f.type) || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name || ''));
+}
+
+/* Read one or more photos of the SAME receipt. Each is OCR'd in turn and its
+   line items are merged onto the running list, with the overlapping region
+   between consecutive photos detected and dropped (see mergeReceiptLines). */
+async function handleReceiptFiles(fileList){
+  const files = Array.from(fileList).filter(isImageFile);
+  if (!files.length){ showToast('Please choose image file(s)'); return; }
+
   rcDone = false;
-  rcPhotoName = file.name || 'receipt.jpg';
-  if (window._rcImgURL){ try { URL.revokeObjectURL(window._rcImgURL); } catch(_){} }
-  window._rcImgURL = URL.createObjectURL(file);
-  rcBusy = true; rcStatus = 'Loading OCR…';
+  rcBusy = true;
+  rcStatus = 'Loading OCR…';
   renderReceipts();
 
-  try {
-    const T = await ensureTesseract();
-    rcStatus = 'Reading receipt…'; setOcrProgress(0.1, rcStatus);
-    const { data } = await T.recognize(file, 'eng', {
-      logger: m => { if (m.status === 'recognizing text') setOcrProgress(m.progress, 'Reading receipt… ' + Math.round(m.progress * 100) + '%'); }
-    });
-    const lines = parseReceiptText(data && data.text ? data.text : '');
-    rcBusy = false;
-    if (lines.length){
-      rcLines = lines;
-      rcStatus = 'Read ' + lines.length + ' item' + (lines.length === 1 ? '' : 's') + ' — check them below.';
-    } else {
-      rcLines = [{ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' }];
-      rcStatus = "Couldn't pick out line items automatically — add them by hand below.";
-    }
-    renderReceipts();
-  } catch (e){
+  let T;
+  try { T = await ensureTesseract(); }
+  catch (e){
     rcBusy = false;
     rcStatus = 'OCR failed: ' + e.message + ' — you can still enter items by hand.';
     if (!rcLines.length) rcLines = [{ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' }];
     renderReceipts();
+    return;
   }
+
+  let addedTotal = 0, droppedTotal = 0, failed = 0;
+  for (let n = 0; n < files.length; n++){
+    const file = files[n];
+    rcPhotos.push({ name: file.name || ('receipt-' + rcPhotos.length + '.jpg'), url: URL.createObjectURL(file) });
+    const pageNo = rcPhotos.length;
+    rcStatus = 'Reading photo ' + pageNo + '…';
+    renderReceipts();
+    try {
+      const { data } = await T.recognize(file, 'eng', {
+        logger: m => { if (m.status === 'recognizing text') setOcrProgress(m.progress, 'Reading photo ' + pageNo + '… ' + Math.round(m.progress * 100) + '%'); }
+      });
+      const parsed = parseReceiptText(data && data.text ? data.text : '');
+      const merged = mergeReceiptLines(rcLines, parsed);
+      addedTotal += merged.added;
+      droppedTotal += merged.dropped;
+      rcLines = merged.lines;
+    } catch (e){ failed++; }
+  }
+
+  rcBusy = false;
+  if (!rcLines.length){
+    rcLines = [{ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' }];
+    rcStatus = "Couldn't pick out line items automatically — add them by hand below.";
+  } else {
+    rcStatus = rcLines.length + ' item' + (rcLines.length === 1 ? '' : 's')
+      + (rcPhotos.length > 1 ? ' from ' + rcPhotos.length + ' photos' : '')
+      + (droppedTotal ? ' · ' + droppedTotal + ' overlapping row' + (droppedTotal === 1 ? '' : 's') + ' removed' : '')
+      + ' — check them below.';
+  }
+  if (failed) rcStatus += ' (' + failed + ' photo' + (failed === 1 ? '' : 's') + " couldn't be read)";
+  renderReceipts();
+}
+
+/* Build a comparison key for a parsed line: normalized name + price + qty. */
+function receiptLineKey(l){
+  const name = String(l.item || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const price = (l.price == null || l.price === '') ? '' : Number(l.price).toFixed(2);
+  return name + '|' + price + '|' + (l.qty || 1);
+}
+
+/* Merge a new photo's lines onto the existing list. A long receipt shot in
+   overlapping segments repeats a run of rows: the tail of what we have so far
+   equals the head of the next photo. Find the longest such overlap and append
+   only the genuinely new rows. Returns {lines, added, dropped}. */
+function mergeReceiptLines(existing, incoming){
+  if (!existing.length) return { lines: incoming.slice(), added: incoming.length, dropped: 0 };
+  if (!incoming.length) return { lines: existing.slice(), added: 0, dropped: 0 };
+  const maxK = Math.min(existing.length, incoming.length);
+  let overlap = 0;
+  for (let k = maxK; k >= 1; k--){
+    let match = true;
+    for (let j = 0; j < k; j++){
+      if (receiptLineKey(existing[existing.length - k + j]) !== receiptLineKey(incoming[j])){ match = false; break; }
+    }
+    if (match){ overlap = k; break; }
+  }
+  const tail = incoming.slice(overlap);
+  return { lines: existing.concat(tail), added: tail.length, dropped: overlap };
 }
 
 function setOcrProgress(p, msg){
@@ -1313,7 +1385,8 @@ async function submitReceipt(){
     type: 'receipt',
     date: rcDate,
     store: rcStore.trim(),
-    photo: rcPhotoName,
+    photo: rcPhotos.map(p => p.name).join('; '),
+    photoCount: rcPhotos.length,
     total: +r.total.toFixed(2),
     lines: r.lines.map(l => ({ item: l.item, qty: l.qty, price: l.price, category: l.category })),
     timestamp: new Date().toISOString()

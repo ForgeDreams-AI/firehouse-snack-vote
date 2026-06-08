@@ -21,8 +21,15 @@ No server to run, no account for voters.
 ## The Receipts feature (what you asked for)
 
 1. Open the **Receipts** tab and tap **Add a receipt photo** (camera or library).
-2. The photo is read **on your phone** with [Tesseract.js](https://tesseract.js.org/)
-   (loaded once from a CDN — no API key, nothing uploaded to read it).
+   Long receipt? **Add several photos top-to-bottom** (or select multiple at once) —
+   each one becomes a numbered page in the strip.
+2. Each photo is read **on your phone** with [Tesseract.js](https://tesseract.js.org/)
+   (loaded once from a CDN — no API key, nothing uploaded to read it). When photos
+   **overlap**, the app detects the repeated run of rows (the tail of one page that
+   matches the head of the next) and **drops the duplicates automatically**, so an
+   item that shows up in two photos is only counted once. The status line tells you
+   how many overlapping rows it removed; anything it misses you can delete in the
+   review table.
 3. A **review table** appears: item, qty, price each, and category. The scan is
    never perfect, so fix anything that looks off and delete junk rows. You can
    also **add lines by hand** or skip OCR entirely.
@@ -218,6 +225,7 @@ fonts load from public CDNs on demand.
 
 ## Privacy note on receipts
 
-Receipt photos are read **in the browser** and are **not uploaded**. Only the
-final line items you confirm (item, qty, price, category, date, optional store
-name and the photo's file name) are sent to your Sheet.
+Receipt photos are read **in the browser** and are **not uploaded** (even when a
+long receipt takes several photos). Only the final line items you confirm (item,
+qty, price, category, date, optional store name and the photos' file names) are
+sent to your Sheet.
