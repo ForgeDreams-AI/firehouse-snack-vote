@@ -39,9 +39,15 @@ so opening **+ Log Payment** and tapping a method or **Log payment** threw a
 | `r.statusLabel` (server sends `status`) → wrong badge | uses `r.status` + colored badge |
 | Review queue had no actions | Added **Assign**, **Split** (with live balance check), and **Dismiss** |
 | No pause control | Added a **Pause/Resume reminders** button |
+| No receipt UI (backend existed, dashboard didn't use it) | Added an **Add Receipt** flow: upload → Drive OCR → edit items/tax/total with live reconcile → **Save & email** the spend report (`uploadReceiptWeb`/`confirmReceiptWeb`) |
 
 The backend `.gs` files were **not the problem** and are unchanged from what's
 deployed — they're saved here verbatim for backup.
+
+> **Receipt OCR needs the Drive advanced service:** Apps Script editor →
+> **Services (+) → Drive API (v2)**, then re-run any function once to approve the
+> new permissions. Without it, uploads still save the file and you type the items
+> in by hand.
 
 ### To deploy the fix
 1. Apps Script editor → open the `dashboard.html` file.
