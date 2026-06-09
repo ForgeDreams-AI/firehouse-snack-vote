@@ -30,11 +30,9 @@ No server to run, no account for voters.
    item that shows up in two photos is only counted once. The status line tells you
    how many overlapping rows it removed; anything it misses you can delete in the
    review table.
-3. A **review table** appears: item, qty, price each, and category. The parser
-   strips pack/size noise out of names (e.g. `Gatorade 20oz 12pk` → `Gatorade`)
-   and **groups multiples of the same product into one row** with the quantity
-   summed. The scan is never perfect, so fix anything that looks off, delete junk
-   rows, **add lines by hand**, or hit **Group duplicates** after editing names.
+3. A **review table** appears: item, qty, price each, and category. The scan is
+   never perfect, so fix anything that looks off and delete junk rows. You can
+   also **add lines by hand** or skip OCR entirely.
 4. A **report** of what was bought (grouped by section, with totals) builds live.
    Copy it with **Copy report**.
 5. Tap **Save receipt**. That sends the line items to your Apps Script, which:
