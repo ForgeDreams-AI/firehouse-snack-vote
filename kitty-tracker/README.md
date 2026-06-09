@@ -55,6 +55,13 @@ deployed — they're saved here verbatim for backup.
 3. Save. **Deploy → Manage deployments → Edit → New version → Deploy** (keep the
    same `/exec` URL).
 
+## Using the Review queue (assigning payments)
+Venmo payments the parser couldn't match show up under **Needs Review**:
+- **Assign** — pick the recruit in the dropdown, click **Assign**. Credits them, clears the review.
+- **Split** — one payment that covered several recruits: click **Split**, **+ Add recruit** for each, enter amounts (and optional weeks like `1,2`); the **Remaining** must read `$0.00 ✓ balanced`, then **Save split**.
+- **Dismiss** — removes a row that isn't a dues payment.
+- Person missing from the dropdown? Add them to the **Roster** tab (or via the sign-up Form) and refresh.
+
 ## Setup notes (for reference)
 - Run `setupKitty()` once to create/upgrade tabs (Roster, Ledger, Expenses) and
   back-fill from Venmo emails.

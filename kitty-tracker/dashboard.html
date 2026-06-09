@@ -195,6 +195,7 @@ function render(d){
   // Review queue first — it's what needs action.
   if(d.review && d.review.length){
     h += '<h1 style="margin-top:16px;font-size:14px">Needs Review ('+d.review.length+')</h1>';
+    h += '<p class="sub" style="margin:0 0 8px">Unmatched payments. Pick a recruit + <b>Assign</b>, or <b>Split</b> one payment across several recruits (parts must add up), or <b>Dismiss</b> if it isn\'t dues. Not in the list? Add them to the Roster tab first.</p>';
     d.review.forEach(r => {
       h += '<div class="review">'
         +  '<b>'+esc(r.payer||r.name||'Unknown')+'</b> sent <b>'+money(r.amount)+'</b> via '+esc(r.method)+' <span class="sub">(row '+r.row+')</span>'
