@@ -66,6 +66,11 @@
          font-weight:700;font-size:14px;padding:10px 18px;border-radius:24px;z-index:90;opacity:0;
          pointer-events:none;transition:opacity .25s;}
   .toast.on{opacity:1;}
+  .rtable{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0;}
+  .rtable th{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);text-align:left;padding:4px;}
+  .rtable td{padding:3px;border-bottom:1px solid var(--line);}
+  .rtable input{width:100%;font:inherit;padding:6px;border-radius:6px;background:var(--char);color:var(--cream);border:1px solid var(--line);}
+  button.x{padding:5px 9px;}
   a{color:var(--amber);}
 </style>
 </head>
@@ -110,6 +115,28 @@
       <div class="rem" id="sRem"></div>
       <div class="modActs" style="margin-top:10px"><button onclick="closeSplit()">Cancel</button>
                            <button class="go" id="sSave" onclick="saveSplit()">Save split</button></div>
+    </div>
+  </div>
+
+  <!-- Receipt upload → OCR → review → save + email spend report -->
+  <div class="ovl" id="receipt">
+    <div class="card">
+      <h2>Add receipt</h2>
+      <div class="fld"><label>Receipt image (Costco run, etc.)</label>
+        <input id="rcFile" type="file" accept="image/*,application/pdf" onchange="onReceiptFile()"></div>
+      <div id="rcStatus" class="sub" style="margin-bottom:10px"></div>
+      <div class="fld"><label>Vendor</label><input id="rcVendor" type="text" value="Costco"></div>
+      <label class="sub" style="display:block;margin-bottom:4px">Line items (fix anything OCR got wrong)</label>
+      <div id="rcItems"></div>
+      <div class="modActs" style="margin-top:6px"><button onclick="addReceiptItem()">+ Add item</button></div>
+      <div class="fld" style="margin-top:10px"><label>Tax ($)</label>
+        <input id="rcTax" type="number" step="0.01" min="0" value="0" oninput="recomputeReceipt()"></div>
+      <div class="fld"><label>Printed total ($) — from the bottom of the receipt</label>
+        <input id="rcTotal" type="number" step="0.01" min="0" placeholder="0.00" oninput="recomputeReceipt()"></div>
+      <div class="fld"><label>Notes (optional)</label><input id="rcNotes" type="text"></div>
+      <div class="rem" id="rcRecon"></div>
+      <div class="modActs" style="margin-top:10px"><button onclick="closeReceipt()">Cancel</button>
+                           <button class="go" id="rcSave" onclick="saveReceipt(false)">Save &amp; email report</button></div>
     </div>
   </div>
 
@@ -162,7 +189,8 @@ function render(d){
   h += '</div>';
   h += '<div class="meter"><div class="meterfill" style="width:'+pct+'%"></div></div>';
   h += '<div style="text-align:right;font-size:11px;color:var(--mut);margin:4px 0 8px">'+pct+'% collected</div>';
-  h += '<div class="acts"><button class="go" onclick="openModal()">+ Log Payment</button></div>';
+  h += '<div class="acts"><button class="go" onclick="openModal()">+ Log Payment</button>'
+    +  '<button onclick="openReceipt()">📁 Add Receipt</button></div>';
 
   // Review queue first — it's what needs action.
   if(d.review && d.review.length){
@@ -373,6 +401,130 @@ function saveSplit(){
     else { toast(r.msg||'Split must balance.'); }
   }).withFailureHandler(e => { btn.disabled=false; toast('Error: '+(e&&e.message?e.message:e)); })
     .splitVenmoReviewWeb(SPLIT.row, list);
+}
+
+/* ── Receipt upload (Feature 3) ── */
+let RC = { purchaseId:'', receiptUrl:'', items:[] };
+
+function openReceipt(){
+  RC = { purchaseId:'', receiptUrl:'', items:[{name:'',qty:1,unit:0,line:0}] };
+  document.getElementById('rcFile').value = '';
+  document.getElementById('rcVendor').value = 'Costco';
+  document.getElementById('rcTax').value = '0';
+  document.getElementById('rcTotal').value = '';
+  document.getElementById('rcNotes').value = '';
+  document.getElementById('rcSave').disabled = false;
+  document.getElementById('rcStatus').textContent = 'Upload a receipt — it gets read automatically, then you fix the list. (No file? Just type the items.)';
+  renderReceiptItems();
+  recomputeReceipt();
+  show('receipt');
+}
+function closeReceipt(){ hide('receipt'); }
+
+function onReceiptFile(){
+  const f = document.getElementById('rcFile').files[0];
+  if(!f) return;
+  document.getElementById('rcStatus').textContent = 'Reading receipt… (OCR can take 10–20s)';
+  const reader = new FileReader();
+  reader.onload = () => {
+    const b64 = String(reader.result).split(',')[1] || '';
+    google.script.run.withSuccessHandler(onReceiptOcr).withFailureHandler(e=>{
+      document.getElementById('rcStatus').textContent = 'Upload failed: '+(e&&e.message?e.message:e);
+    }).uploadReceiptWeb(b64, f.type, f.name);
+  };
+  reader.readAsDataURL(f);
+}
+function onReceiptOcr(res){
+  if(!res || !res.ok){ document.getElementById('rcStatus').textContent = (res&&res.msg)||'Upload failed.'; return; }
+  RC.purchaseId = res.purchaseId; RC.receiptUrl = res.receiptUrl;
+  RC.items = (res.items||[]).map(it=>({ name:it.name, qty:it.qty, unit:it.unit, line:it.line }));
+  if(!RC.items.length) RC.items = [{name:'',qty:1,unit:0,line:0}];
+  const link = res.receiptUrl ? ' · <a href="'+esc(res.receiptUrl)+'" target="_blank">saved receipt</a>' : '';
+  document.getElementById('rcStatus').innerHTML = (res.warn ? esc(res.warn) : ('Read '+RC.items.length+' item(s) — check them.')) + link;
+  renderReceiptItems();
+  recomputeReceipt();
+}
+
+function renderReceiptItems(){
+  let h = '<table class="rtable"><thead><tr><th>Item</th><th style="width:46px">Qty</th><th style="width:66px">Unit</th><th style="width:66px">Line</th><th></th></tr></thead><tbody>';
+  RC.items.forEach((it,i)=>{
+    h += '<tr>'
+      + '<td><input data-i="'+i+'" data-k="name" value="'+esc(it.name)+'"></td>'
+      + '<td><input data-i="'+i+'" data-k="qty" type="number" step="1" min="0" value="'+esc(it.qty)+'"></td>'
+      + '<td><input data-i="'+i+'" data-k="unit" type="number" step="0.01" min="0" value="'+esc(it.unit)+'"></td>'
+      + '<td><input data-i="'+i+'" data-k="line" type="number" step="0.01" min="0" value="'+esc(it.line)+'"></td>'
+      + '<td><button class="x" onclick="removeReceiptItem('+i+')">✕</button></td></tr>';
+  });
+  h += '</tbody></table>';
+  document.getElementById('rcItems').innerHTML = h;
+  document.querySelectorAll('#rcItems input').forEach(inp => inp.addEventListener('input', onReceiptCell));
+}
+function onReceiptCell(e){
+  const inp = e.target, i = +inp.getAttribute('data-i'), k = inp.getAttribute('data-k');
+  if(!RC.items[i]) return;
+  if(k==='name'){ RC.items[i].name = inp.value; }
+  else {
+    RC.items[i][k] = parseFloat(inp.value)||0;
+    if(k==='qty' || k==='unit'){   // keep Line = Qty × Unit as you type
+      RC.items[i].line = Math.round((RC.items[i].qty * RC.items[i].unit)*100)/100;
+      const lineInp = document.querySelector('#rcItems input[data-i="'+i+'"][data-k="line"]');
+      if(lineInp) lineInp.value = RC.items[i].line;
+    }
+  }
+  recomputeReceipt();
+}
+function addReceiptItem(){ RC.items.push({name:'',qty:1,unit:0,line:0}); renderReceiptItems(); recomputeReceipt(); }
+function removeReceiptItem(i){
+  RC.items.splice(i,1);
+  if(!RC.items.length) RC.items = [{name:'',qty:1,unit:0,line:0}];
+  renderReceiptItems(); recomputeReceipt();
+}
+
+function recomputeReceipt(){
+  const tax = parseFloat(document.getElementById('rcTax').value)||0;
+  const printed = parseFloat(document.getElementById('rcTotal').value)||0;
+  const sub = RC.items.reduce((s,it)=> s + (parseFloat(it.line)||0), 0);
+  const computed = Math.round((sub + tax)*100)/100;
+  const el = document.getElementById('rcRecon');
+  if(printed > 0){
+    const d = Math.round((computed - printed)*100)/100;
+    el.textContent = 'Items + tax = '+money(computed)+' vs printed '+money(printed)+(Math.abs(d)<0.01 ? '  ✓ matches' : '  · off by '+money(Math.abs(d)));
+    el.style.color = Math.abs(d)<0.01 ? 'var(--good)' : '#ff6b73';
+  } else {
+    el.textContent = 'Items + tax = '+money(computed);
+    el.style.color = 'var(--mut)';
+  }
+}
+
+function saveReceipt(override){
+  const items = RC.items
+    .map(it=>({ name:String(it.name||'').trim(), qty:Number(it.qty)||1, unit:Number(it.unit)||0, line:Number(it.line)||0 }))
+    .filter(it=>it.name);
+  if(!items.length){ toast('Add at least one item.'); return; }
+  const payload = {
+    purchaseId: RC.purchaseId,
+    vendor: document.getElementById('rcVendor').value.trim() || 'Costco',
+    items: items,
+    tax: parseFloat(document.getElementById('rcTax').value)||0,
+    printedTotal: parseFloat(document.getElementById('rcTotal').value)||0,
+    receiptUrl: RC.receiptUrl,
+    notes: document.getElementById('rcNotes').value.trim(),
+    override: !!override
+  };
+  const btn = document.getElementById('rcSave'); btn.disabled = true;
+  document.getElementById('rcStatus').textContent = 'Saving + emailing the spend report…';
+  google.script.run.withSuccessHandler(res=>{
+    btn.disabled = false;
+    if(res && res.ok){ closeReceipt(); toast(res.msg||'Receipt saved.'); load(); }
+    else if(res && res.reconcile){
+      document.getElementById('rcStatus').textContent = '';
+      if(confirm((res.msg||'Totals do not match.')+'\n\nSave anyway?')) saveReceipt(true);
+    } else {
+      toast((res&&res.msg)||'Could not save receipt.');
+      document.getElementById('rcStatus').textContent = (res&&res.msg)||'';
+    }
+  }).withFailureHandler(e=>{ btn.disabled=false; toast('Error: '+(e&&e.message?e.message:e)); })
+    .confirmReceiptWeb(payload);
 }
 
 load();
