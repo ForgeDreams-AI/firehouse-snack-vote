@@ -1003,12 +1003,12 @@ function renderReceipts(){
 
   let h = `<p class="note" style="margin-top:14px">Snap or upload a receipt. The app reads it on your phone, you fix anything that looks off, and saving logs what was bought, adds those items to the ballot with their prices, and tags them 🛒 <b>bought last week</b> for next week's vote.</p>`;
 
-  // Upload / capture zone
+  // Upload zone (file picker — not forced to the camera)
   const addMore = rcPhotos.length > 0;
   h += `<div id="rc-drop" class="drop">
-      <div class="big">📷 ${addMore ? 'Add another photo (page ' + (rcPhotos.length + 1) + ')' : 'Tap to add a receipt photo'}</div>
-      <div class="sm">Long receipt? Add several photos top-to-bottom — overlap between them is removed automatically. You can pick more than one at once. JPG/PNG/HEIC.</div>
-      <input id="rc-file" type="file" accept="image/*" capture="environment" multiple class="hide">
+      <div class="big">📁 ${addMore ? 'Add another file (page ' + (rcPhotos.length + 1) + ')' : 'Tap to upload a receipt'}</div>
+      <div class="sm">Pick a receipt image from your files. Long receipt? Add several files top-to-bottom — overlap between them is removed automatically. You can choose more than one at once. JPG/PNG/HEIC.</div>
+      <input id="rc-file" type="file" accept="image/*" multiple class="hide">
     </div>`;
 
   // Photo strip + OCR progress
