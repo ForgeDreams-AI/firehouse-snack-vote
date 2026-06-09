@@ -1051,7 +1051,7 @@ function renderReceipts(){
     });
     h += `</tbody></table>`;
     h += `<datalist id="rc-cats">${CATEGORY_ORDER.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
-    h += `<div class="toolbar"><button id="rc-add" class="btn" type="button">+ Add line</button><button id="rc-group" class="btn" type="button">Group duplicates</button></div>`;
+    h += `<div class="toolbar"><button id="rc-add" class="btn" type="button">+ Add line</button></div>`;
 
     // Report preview (live-updated as rows are edited)
     h += `<div id="rc-report-slot">` + renderReceiptReportHTML() + `</div>`;
@@ -1156,12 +1156,6 @@ function wireReceipts(){
   document.querySelectorAll('.xbtn').forEach(b => b.addEventListener('click', () => removeRcRow(+b.getAttribute('data-x'))));
 
   const add = document.getElementById('rc-add'); if (add) add.addEventListener('click', () => addRcRow());
-  const grp = document.getElementById('rc-group'); if (grp) grp.addEventListener('click', () => {
-    const before = rcLines.length;
-    rcLines = groupReceiptLines(rcLines);
-    showToast(before > rcLines.length ? (before - rcLines.length) + ' duplicate' + (before - rcLines.length === 1 ? '' : 's') + ' grouped' : 'No duplicates found');
-    renderReceipts();
-  });
   const copy = document.getElementById('rc-copy'); if (copy) copy.addEventListener('click', copyReceiptReport);
   const save = document.getElementById('rc-save'); if (save) save.addEventListener('click', submitReceipt);
 }
@@ -1258,38 +1252,13 @@ async function handleReceiptFiles(fileList){
     rcLines = [{ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' }];
     rcStatus = "Couldn't pick out line items automatically — add them by hand below.";
   } else {
-    const before = rcLines.length;
-    rcLines = groupReceiptLines(rcLines);     // combine multiples of the same product
-    const grouped = before - rcLines.length;
     rcStatus = rcLines.length + ' item' + (rcLines.length === 1 ? '' : 's')
       + (rcPhotos.length > 1 ? ' from ' + rcPhotos.length + ' photos' : '')
-      + (droppedTotal ? ' · ' + droppedTotal + ' overlap removed' : '')
-      + (grouped ? ' · ' + grouped + ' duplicate' + (grouped === 1 ? '' : 's') + ' grouped' : '')
+      + (droppedTotal ? ' · ' + droppedTotal + ' overlapping row' + (droppedTotal === 1 ? '' : 's') + ' removed' : '')
       + ' — check them below.';
   }
   if (failed) rcStatus += ' (' + failed + ' photo' + (failed === 1 ? '' : 's') + " couldn't be read)";
   renderReceipts();
-}
-
-/* Combine multiples of the same product (same name + same price) into one row,
-   summing the quantities. Rows with no name are left untouched. Preserves the
-   first-seen order. */
-function groupReceiptLines(lines){
-  const out = [], idx = {};
-  lines.forEach(l => {
-    const nm = String(l.item || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (!nm){ out.push(l); return; }
-    const price = (l.price == null || l.price === '') ? '' : Number(l.price).toFixed(2);
-    const key = nm + '|' + price;
-    if (idx[key] != null){
-      const t = out[idx[key]];
-      t.qty = (parseInt(t.qty, 10) || 0) + (parseInt(l.qty, 10) || 0);
-    } else {
-      idx[key] = out.length;
-      out.push(Object.assign({}, l));
-    }
-  });
-  return out;
 }
 
 /* Build a comparison key for a parsed line: normalized name + price + qty. */
@@ -1327,24 +1296,19 @@ function setOcrProgress(p, msg){
 }
 
 /* Heuristic receipt parser. Pulls "<name> ... <price>" lines, drops the
-   subtotal/tax/total/payment noise, guesses qty from "2 @"/"2 x" patterns, and
-   strips numbers/pack-sizes out of the product name. Multiples of the same
-   product are combined later by groupReceiptLines().
+   subtotal/tax/total/payment noise, and guesses qty from "2 @"/"2 x" patterns.
    Whatever it gets wrong, the review table lets the crew fix in seconds. */
 function parseReceiptText(text){
-  const SKIP = /\b(sub\s*total|subtotal|total|tax|hst|gst|pst|vat|balance|change|cash|debit|credit|visa|master|amex|tender|approved|auth|ref|aid|account|card|terminal|store|tel|phone|receipt|cashier|reg(ister)?|invoice|order|date|time|thank|welcome|member|points|savings|loyalty|qty|coupon|discount)\b/i;
+  const SKIP = /\b(sub\s*total|subtotal|total|tax|hst|gst|pst|vat|balance|change|cash|debit|credit|visa|master|amex|tender|approved|auth|ref|aid|account|card|terminal|store|tel|phone|receipt|cashier|reg(ister)?|invoice|order|date|time|thank|welcome|member|points|savings|loyalty|qty)\b/i;
   const out = [];
   String(text || '').split(/\r?\n/).forEach(raw => {
     let line = raw.replace(/\s+/g, ' ').trim();
     if (line.length < 3) return;
-    // Find every money-looking token; use the LAST one as the line price so
-    // trailing columns (tax flags, a second price) don't hide it. Higher recall.
-    const money = line.match(/(?:\$\s*)?\d{1,4}[.,]\d{2}/g);
-    if (!money) return;
-    const lastTok = money[money.length - 1];
-    const at_idx = line.lastIndexOf(lastTok);
-    const lineTotal = parseFloat(lastTok.replace(/[^0-9.,]/g, '').replace(',', '.'));
-    let name = line.slice(0, at_idx).trim();
+    // find a price near the end: 1.99 / 12.50 / $3.00 (allow trailing letters like T/F tax flags)
+    const pm = line.match(/(?:\$\s*)?(\d{1,4}[.,]\d{2})(?:\s*[A-Z]{1,2})?\s*$/);
+    if (!pm) return;
+    const lineTotal = parseFloat(pm[1].replace(',', '.'));
+    let name = line.slice(0, pm.index).trim();
     // strip leading item codes / UPCs / leading symbols
     name = name.replace(/^\d{5,}\s+/, '').replace(/^[#*]+\s*/, '').trim();
     let qty = 1, unit = lineTotal;
@@ -1363,7 +1327,7 @@ function parseReceiptText(text){
         if (qty > 1 && lineTotal / qty >= 0.25) unit = +(lineTotal / qty).toFixed(2); // split total into per-unit
       }
     }
-    name = cleanItemName(name);
+    name = name.replace(/[^A-Za-z0-9 &'./-]/g, '').replace(/\s+/g, ' ').trim();
     if (!name || name.length < 2) return;
     if (SKIP.test(line) || SKIP.test(name)) return;
     if (!/[A-Za-z]/.test(name)) return;        // need at least some letters
@@ -1371,19 +1335,6 @@ function parseReceiptText(text){
     out.push({ item: titleCase(name), qty, price: unit, category: guessCategory(name) });
   });
   return out;
-}
-
-/* Keep just the product name: drop pack/size specs (40pk, 12 oz, 2L, 6ct, x12),
-   then drop any standalone number tokens — but leave numbers fused into a word
-   (7UP, V8) alone. */
-function cleanItemName(name){
-  let s = ' ' + String(name) + ' ';
-  s = s.replace(/\s\d+(\.\d+)?\s?(pk|pack|ct|count|oz|ozs|lb|lbs|kg|mg|ml|ltr|liter|litre|qt|gal|gallon|pc|pcs|cans?|btl|bottles?)\b/gi, ' ');
-  s = s.replace(/\s\d+(\.\d+)?\s?[gl]\b/gi, ' ');     // 2L, 500g (single-letter units)
-  s = s.replace(/\sx\s?\d+\b/gi, ' ');                // x12
-  s = s.replace(/\s\d+(\.\d+)?(?=\s)/g, ' ');         // leftover standalone numbers
-  s = s.replace(/[^A-Za-z0-9 &'./-]/g, ' ');
-  return s.replace(/\s{2,}/g, ' ').trim();
 }
 
 function titleCase(s){
