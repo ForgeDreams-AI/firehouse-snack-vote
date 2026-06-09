@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root{ --red:#C8102E; --char:#15171B; --char2:#1E2127; --line:#33373F; --cream:#F3EFE7;
+         --mut:#8A909A; --good:#3DBE6B; --amber:#FFB400; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,Arial,sans-serif;background:var(--char);color:var(--cream);padding:12px;}
+  h1{font-size:17px;letter-spacing:.5px;text-transform:uppercase;}
+  .bar{background:var(--char2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .big{font-size:22px;font-weight:700;}
+  .row2{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+  .pill{font-size:13px;padding:4px 10px;border-radius:20px;background:var(--char);border:1px solid var(--line);}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--char);
+         color:var(--cream);padding:7px 11px;font-size:13px;}
+  button:hover{border-color:var(--amber);}
+  button.warn{background:var(--amber);color:#15171B;border-color:var(--amber);font-weight:700;}
+  button.go{background:var(--red);color:#fff;border-color:var(--red);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);}
+  .ok{color:var(--good);font-weight:700;} .no{color:#ff6b73;font-weight:700;}
+  .amber{color:var(--amber);font-weight:700;}
+  .acts{display:flex;gap:5px;flex-wrap:wrap;}
+  .acts button{padding:5px 8px;font-size:12px;}
+  .review{background:#3a2a00;border:1px solid var(--amber);border-radius:10px;padding:11px;margin-bottom:8px;font-size:13.5px;}
+  .review select,.review input{font:inherit;padding:5px;border-radius:6px;background:var(--char);color:var(--cream);border:1px solid var(--line);}
+  .review .line{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+  .msg{font-size:13px;color:var(--good);min-height:18px;margin-top:6px;}
+  .spin{color:var(--mut);padding:30px;text-align:center;}
+  .meter{height:8px;background:var(--char);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:8px;}
+  .meterfill{height:100%;background:linear-gradient(90deg,var(--red),var(--amber));}
+  .sub{font-size:11px;color:var(--mut);margin-top:2px;}
+  .moneyin{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+  .chip{flex:1;min-width:90px;background:var(--char);border:1px solid var(--line);border-radius:10px;padding:9px 11px;}
+  .chip .k{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);}
+  .chip .v{font-size:16px;font-weight:700;}
+  .badge{font-size:10px;font-weight:700;letter-spacing:.5px;padding:2px 6px;border-radius:5px;display:inline-block;}
+  .badge.late{background:#3a1414;color:#ff6b73;border:1px solid #6e1d1d;}
+  .badge.current{background:#103a22;color:var(--good);border:1px solid #1d6e40;}
+  .badge.ahead{background:#0e2740;color:#5aa9ff;border:1px solid #1d4d80;}
+  .badge.full{background:#103a22;color:var(--good);border:1px solid #1d6e40;}
+  .badge.over{background:#3a2a00;color:var(--amber);border:1px solid #6e5a1d;}
+  .ovl{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:50;}
+  .ovl.on{display:flex;}
+  .card{background:var(--char2);border:1px solid var(--line);border-radius:14px;padding:18px;max-width:460px;width:100%;max-height:90vh;overflow:auto;}
+  .card h2{font-size:15px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
+  .fld{margin-bottom:13px;}
+  .fld label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-bottom:5px;}
+  .fld select,.fld input{width:100%;font:inherit;padding:9px;border-radius:8px;background:var(--char);color:var(--cream);border:1px solid var(--line);}
+  .seg{display:flex;gap:6px;} .seg button{flex:1;}
+  .seg button.sel{background:var(--red);color:#fff;border-color:var(--red);font-weight:700;}
+  .wks{display:flex;flex-wrap:wrap;gap:5px;}
+  .wks button{padding:7px 0;width:calc(20% - 4px);font-size:13px;}
+  .wks button.sel{background:var(--amber);color:#15171B;border-color:var(--amber);font-weight:700;}
+  .wks button.cov{background:#23262c;color:var(--mut);border-style:dashed;}
+  .modActs{display:flex;gap:8px;margin-top:4px;} .modActs button{flex:1;}
+  .splitLine{display:flex;gap:5px;margin-top:6px;align-items:center;}
+  .splitLine select{flex:2;} .splitLine input{flex:1;min-width:0;}
+  .splitLine .wk{flex:1.2;} .splitLine .x{flex:0 0 auto;padding:5px 9px;}
+  .rem{font-size:12px;margin-top:7px;}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--good);color:#06270f;
+         font-weight:700;font-size:14px;padding:10px 18px;border-radius:24px;z-index:90;opacity:0;
+         pointer-events:none;transition:opacity .25s;}
+  .toast.on{opacity:1;}
+  a{color:var(--amber);}
+</style>
+</head>
+<body>
+  <div id="app"><div class="spin">Loading…</div></div>
+  <div id="toast" class="toast"></div>
+
+  <!-- Payment modal: cash/venmo · multi-week picker · custom amount · payer -->
+  <div class="ovl" id="modal">
+    <div class="card">
+      <h2 id="mTitle">Log payment</h2>
+      <div class="fld"><label>Recruit (credited to)</label><select id="mRecruit" onchange="onModalRecruit()"></select></div>
+      <div class="fld"><label>Method</label>
+        <div class="seg"><button id="mCash" onclick="setMethod('Cash')">💵 Cash</button>
+                         <button id="mVenmo" onclick="setMethod('Venmo')">Venmo</button></div></div>
+      <div class="fld"><label>Weeks (tap to toggle · greyed = already covered)</label><div class="wks" id="mWks"></div></div>
+      <div class="fld"><label>Amount ($) — auto = $20 × weeks, or type a custom total</label>
+        <input id="mAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" oninput="amtTouched()"></div>
+      <div class="fld"><label>Paid by (leave as-is unless someone else paid)</label>
+        <input id="mPayer" type="text" placeholder="recruit's own name"></div>
+      <div class="modActs"><button onclick="closeModal()">Cancel</button>
+                           <button class="go" id="mLog" onclick="logPay()">Log payment</button></div>
+    </div>
+  </div>
+
+  <!-- Per-recruit payments drill-down -->
+  <div class="ovl" id="drill">
+    <div class="card">
+      <h2 id="dTitle">Payments</h2>
+      <div id="dBody"><div class="spin">Loading…</div></div>
+      <div class="modActs" style="margin-top:12px"><button onclick="closeDrill()">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Split one unmatched Venmo across recruits -->
+  <div class="ovl" id="split">
+    <div class="card">
+      <h2 id="sTitle">Split payment</h2>
+      <p class="sub" id="sInfo"></p>
+      <div id="sLines"></div>
+      <div class="modActs" style="margin-top:8px"><button onclick="addSplitLine()">+ Add recruit</button></div>
+      <div class="rem" id="sRem"></div>
+      <div class="modActs" style="margin-top:10px"><button onclick="closeSplit()">Cancel</button>
+                           <button class="go" id="sSave" onclick="saveSplit()">Save split</button></div>
+    </div>
+  </div>
+
+<script>
+let DATA = null;
+let M = { method:'Cash', weeks:new Set(), amtTouched:false, weeksCovered:0 };
+let SPLIT = { row:0, amount:0, payer:'' };
+
+function money(n){ return '$' + Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtTs(t){
+  try{ const d=new Date(t); if(isNaN(d.getTime())) return String(t);
+    return (d.getMonth()+1)+'/'+d.getDate()+' '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+  }catch(e){ return String(t); }
+}
+let toastTimer=null;
+function toast(m){
+  const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('on'),2600);
+}
+function show(id){ document.getElementById(id).classList.add('on'); }
+function hide(id){ document.getElementById(id).classList.remove('on'); }
+
+function load(){ google.script.run.withSuccessHandler(render).withFailureHandler(fail).getDashboardData(); }
+function fail(e){ document.getElementById('app').textContent='Error: '+(e&&e.message?e.message:String(e)); }
+
+function rosterOptions(){
+  let o = '<option value="">— recruit —</option>';
+  (DATA && DATA.roster || []).forEach(r => { o += '<option value="'+esc(r.rid)+'">'+esc(r.name)+'</option>'; });
+  return o;
+}
+
+function render(d){
+  if(!d){ document.getElementById('app').textContent='No data returned from server'; return; }
+  DATA = d;
+  const wk = d.week, pct = d.expected ? Math.min(100,Math.round(d.collected/d.expected*100)) : 0;
+  let h = '';
+  h += '<div class="bar"><div class="row2"><h1 style="flex:1">PHX FD Kitty &nbsp;·&nbsp; Week '+wk+'/'+d.seasonWeeks+'</h1>';
+  h += '<button class="'+(d.paused?'warn':'')+'" onclick="togglePause()">'+(d.paused?'▶ Resume reminders':'⏸ Pause reminders')+'</button></div></div>';
+  h += '<div class="row2">';
+  h += '<div class="pill">Collected <span class="big">'+money(d.collected)+'</span></div>';
+  h += '<div class="pill">Expected <span class="big">'+money(d.expected)+'</span></div>';
+  h += '<div class="pill">Balance <span class="big">'+money(d.kitty.balance)+'</span></div>';
+  h += '<div class="pill">Paid <span class="big">'+d.paidCount+' / '+d.activeCount+'</span></div>';
+  h += '</div>';
+  h += '<div class="row2" style="margin-top:8px">';
+  h += '<div class="chip"><span class="k">Cash</span><br><span class="v">'+money(d.moneyIn.cash)+'</span></div>';
+  h += '<div class="chip"><span class="k">Venmo</span><br><span class="v">'+money(d.moneyIn.venmo)+'</span></div>';
+  h += '<div class="chip"><span class="k">Spent</span><br><span class="v">'+money(d.kitty.spent)+'</span></div>';
+  h += '</div>';
+  h += '<div class="meter"><div class="meterfill" style="width:'+pct+'%"></div></div>';
+  h += '<div style="text-align:right;font-size:11px;color:var(--mut);margin:4px 0 8px">'+pct+'% collected</div>';
+  h += '<div class="acts"><button class="go" onclick="openModal()">+ Log Payment</button></div>';
+
+  // Review queue first — it's what needs action.
+  if(d.review && d.review.length){
+    h += '<h1 style="margin-top:16px;font-size:14px">Needs Review ('+d.review.length+')</h1>';
+    d.review.forEach(r => {
+      h += '<div class="review">'
+        +  '<b>'+esc(r.payer||r.name||'Unknown')+'</b> sent <b>'+money(r.amount)+'</b> via '+esc(r.method)+' <span class="sub">(row '+r.row+')</span>'
+        +  '<div class="line"><select id="rv_'+r.row+'">'+rosterOptions()+'</select>'
+        +    '<button class="go" onclick="assignReview('+r.row+')">Assign</button>'
+        +    '<button onclick="openSplit('+r.row+','+r.amount+','+JSON.stringify(r.payer||r.name||'')+')">Split</button>'
+        +    '<button onclick="dismissReview('+r.row+')">Dismiss</button></div>'
+        +  '</div>';
+    });
+  }
+
+  h += '<h1 style="margin-top:16px;font-size:14px">Recruits</h1>';
+  h += '<table><thead><tr><th>Name</th><th>Weeks</th><th>Paid</th><th>Owed</th><th>Status</th></tr></thead><tbody>';
+  (d.rows||[]).forEach(r => {
+    const owed = Math.max(0, d.week*d.weeklyDues - r.paid);
+    h += '<tr onclick="drillDown(\''+esc(r.rid)+'\')" style="cursor:pointer">';
+    h += '<td>'+esc(r.name)+'</td>';
+    h += '<td>'+r.weeksCovered+'</td>';
+    h += '<td>'+money(r.paid)+'</td>';
+    h += '<td class="'+(owed>0?'no':'ok')+'">'+money(owed)+'</td>';
+    h += '<td><span class="badge '+(r.statusKind||'')+'">'+esc(r.status||r.statusKind||'')+'</span></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+
+  if(d.recent && d.recent.length){
+    h += '<h1 style="margin-top:16px;font-size:14px">Recent Payments</h1>';
+    h += '<table><thead><tr><th>Time</th><th>Name</th><th>Payer</th><th>Method</th><th>Amount</th></tr></thead><tbody>';
+    d.recent.forEach(r => {
+      h += '<tr><td>'+esc(fmtTs(r.ts))+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.payer||r.name)+'</td><td>'+esc(r.method)+'</td><td>'+money(r.amount)+'</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  document.getElementById('app').innerHTML = h;
+}
+
+/* ── Pause toggle ── */
+function togglePause(){
+  google.script.run.withSuccessHandler(r => { toast(r.paused?'Reminders paused':'Reminders resumed'); load(); })
+                   .withFailureHandler(e => toast('Error: '+e)).togglePauseWeb();
+}
+
+/* ── Log-payment modal ── */
+function openModal(){
+  M = { method:'Cash', weeks:new Set(), amtTouched:false, weeksCovered:0 };
+  document.getElementById('mRecruit').innerHTML = rosterOptions();
+  document.getElementById('mRecruit').value = '';
+  document.getElementById('mAmount').value = '';
+  document.getElementById('mPayer').value = '';
+  document.getElementById('mPayer').placeholder = "recruit's own name";
+  document.getElementById('mLog').disabled = false;
+  setMethod('Cash');
+  renderWeeks();
+  show('modal');
+}
+function closeModal(){ hide('modal'); }
+
+function onModalRecruit(){
+  const rid = document.getElementById('mRecruit').value;
+  const row = (DATA.rows||[]).find(r => r.rid === rid);
+  M.weeksCovered = row ? (row.weeksCovered||0) : 0;
+  document.getElementById('mPayer').placeholder = row ? row.name : "recruit's own name";
+  M.weeks = new Set();
+  M.amtTouched = false;
+  document.getElementById('mAmount').value = '';
+  renderWeeks();
+}
+
+function setMethod(m){
+  M.method = (m === 'Venmo') ? 'Venmo' : 'Cash';
+  document.getElementById('mCash').className  = (M.method==='Cash')  ? 'sel' : '';
+  document.getElementById('mVenmo').className = (M.method==='Venmo') ? 'sel' : '';
+}
+
+function renderWeeks(){
+  const n = (DATA && DATA.seasonWeeks) || 15;
+  let h = '';
+  for(let w=1; w<=n; w++){
+    const cov = w <= M.weeksCovered;
+    const sel = M.weeks.has(w);
+    h += '<button class="'+(sel?'sel':'')+(cov&&!sel?' cov':'')+'" onclick="toggleWeek('+w+')">'+w+'</button>';
+  }
+  document.getElementById('mWks').innerHTML = h;
+}
+function toggleWeek(w){
+  if(M.weeks.has(w)) M.weeks.delete(w); else M.weeks.add(w);
+  renderWeeks();
+  if(!M.amtTouched){
+    const c = M.weeks.size;
+    document.getElementById('mAmount').value = c ? (c * (DATA.weeklyDues||20)).toFixed(2) : '';
+  }
+}
+function amtTouched(){ M.amtTouched = true; }
+
+function logPay(){
+  const rid = document.getElementById('mRecruit').value;
+  if(!rid){ toast('Pick a recruit first.'); return; }
+  const method = M.method;
+  const weeks  = Array.from(M.weeks).sort((a,b)=>a-b);
+  const amount = parseFloat(document.getElementById('mAmount').value) || 0;
+  const payer  = document.getElementById('mPayer').value.trim();
+  const btn = document.getElementById('mLog'); btn.disabled = true;
+
+  const done = res => {
+    btn.disabled = false;
+    if(res && res.ok){ closeModal(); toast(res.msg||'Logged.'); load(); }
+    else { toast((res&&res.msg)||'Could not log payment.'); }
+  };
+  const oops = e => { btn.disabled = false; toast('Error: '+(e&&e.message?e.message:e)); };
+
+  if(weeks.length){
+    google.script.run.withSuccessHandler(done).withFailureHandler(oops)
+      .logWeeksWeb(rid, method, weeks, amount, payer);
+  } else {
+    if(!(amount > 0)){ btn.disabled = false; toast('Pick weeks or enter an amount.'); return; }
+    google.script.run.withSuccessHandler(done).withFailureHandler(oops)
+      .logPaymentWeb(rid, method, amount, payer, '');
+  }
+}
+
+/* ── Per-recruit drill-down ── */
+function drillDown(rid){
+  document.getElementById('dTitle').textContent = 'Payment history';
+  document.getElementById('dBody').innerHTML = '<div class="spin">Loading…</div>';
+  show('drill');
+  google.script.run.withSuccessHandler(renderDrill).withFailureHandler(e=>{
+    document.getElementById('dBody').textContent='Error: '+(e&&e.message?e.message:e);
+  }).getRecruitPaymentsWeb(rid);
+}
+function renderDrill(res){
+  if(!res || !res.ok){ document.getElementById('dBody').textContent = (res&&res.msg)||'Not found.'; return; }
+  document.getElementById('dTitle').textContent = res.name + ' — Payment history';
+  let h = '<div class="row2" style="margin-bottom:10px">'
+    + '<div class="chip"><span class="k">Cash</span><br><span class="v">'+money(res.cash)+'</span></div>'
+    + '<div class="chip"><span class="k">Venmo</span><br><span class="v">'+money(res.venmo)+'</span></div>'
+    + '<div class="chip"><span class="k">Total</span><br><span class="v">'+money(res.total)+'</span></div>'
+    + '<div class="chip"><span class="k">Weeks</span><br><span class="v">'+res.weeksCovered+'</span></div></div>';
+  if(!res.rows.length){ h += '<p class="sub">No payments yet.</p>'; }
+  else{
+    h += '<table><thead><tr><th>Time</th><th>Method</th><th>Amount</th><th>Week</th><th>Payer</th></tr></thead><tbody>';
+    res.rows.forEach(p => {
+      h += '<tr><td>'+esc(fmtTs(p.ts))+'</td><td>'+esc(p.method)+'</td><td>'+money(p.amount)+'</td><td>'+esc(p.week)+'</td><td>'+esc(p.payer)+'</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  document.getElementById('dBody').innerHTML = h;
+}
+function closeDrill(){ hide('drill'); }
+
+/* ── Review actions ── */
+function assignReview(row){
+  const rid = document.getElementById('rv_'+row).value;
+  if(!rid){ toast('Pick a recruit to assign to.'); return; }
+  google.script.run.withSuccessHandler(r => { toast(r.ok?r.msg:(r.msg||'Failed')); if(r.ok) load(); })
+                   .withFailureHandler(e=>toast('Error: '+e)).assignReviewWeb(row, rid);
+}
+function dismissReview(row){
+  if(!confirm('Dismiss this payment? It will be removed from the ledger.')) return;
+  google.script.run.withSuccessHandler(r => { toast(r.ok?r.msg:(r.msg||'Failed')); if(r.ok) load(); })
+                   .withFailureHandler(e=>toast('Error: '+e)).dismissReviewWeb(row);
+}
+
+/* ── Split modal ── */
+function openSplit(row, amount, payer){
+  SPLIT = { row:row, amount:Number(amount)||0, payer:payer||'' };
+  document.getElementById('sTitle').textContent = 'Split ' + money(SPLIT.amount);
+  document.getElementById('sInfo').textContent = 'From ' + (SPLIT.payer||'Unknown') + ' — assign parts that add up to ' + money(SPLIT.amount) + '.';
+  document.getElementById('sLines').innerHTML = '';
+  document.getElementById('sSave').disabled = false;
+  addSplitLine();
+  updateSplitRemaining();
+  show('split');
+}
+function closeSplit(){ hide('split'); }
+function addSplitLine(){
+  const div = document.createElement('div');
+  div.className = 'splitLine';
+  div.innerHTML = '<select>'+rosterOptions()+'</select>'
+    + '<input type="number" step="0.01" min="0" placeholder="$" oninput="updateSplitRemaining()">'
+    + '<input class="wk" type="text" placeholder="weeks e.g. 1,2">'
+    + '<button class="x" onclick="this.parentNode.remove();updateSplitRemaining()">✕</button>';
+  document.getElementById('sLines').appendChild(div);
+}
+function splitAssignments(){
+  return Array.from(document.querySelectorAll('#sLines .splitLine')).map(l => {
+    const sel = l.querySelector('select'), amt = l.querySelectorAll('input')[0], wk = l.querySelector('.wk');
+    return { rid: sel.value, amount: parseFloat(amt.value)||0, weeks: (wk.value||'').replace(/\s/g,'') };
+  }).filter(a => a.rid && a.amount > 0);
+}
+function updateSplitRemaining(){
+  const sum = splitAssignments().reduce((s,a)=>s+a.amount,0);
+  const rem = Math.round((SPLIT.amount - sum)*100)/100;
+  const el = document.getElementById('sRem');
+  el.textContent = 'Remaining: ' + money(rem) + (Math.abs(rem)<0.01 ? '  ✓ balanced' : '');
+  el.style.color = Math.abs(rem)<0.01 ? 'var(--good)' : '#ff6b73';
+}
+function saveSplit(){
+  const list = splitAssignments();
+  if(!list.length){ toast('Add at least one recruit + amount.'); return; }
+  const btn = document.getElementById('sSave'); btn.disabled = true;
+  google.script.run.withSuccessHandler(r => {
+    btn.disabled = false;
+    if(r.ok){ closeSplit(); toast(r.msg||'Split saved.'); load(); }
+    else { toast(r.msg||'Split must balance.'); }
+  }).withFailureHandler(e => { btn.disabled=false; toast('Error: '+(e&&e.message?e.message:e)); })
+    .splitVenmoReviewWeb(SPLIT.row, list);
+}
+
+load();
+</script>
+</body>
+</html>
