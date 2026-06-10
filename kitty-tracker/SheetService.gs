@@ -298,27 +298,47 @@ function _rosterNameTokens_(fullName){
   return { full: norm, first: parts[0] || '', last: parts[parts.length - 1] || '' };
 }
 
-/* Conservative name-in-memo matcher. Avoids false positives on short common
- * tokens by requiring first-name length ≥ 4 OR a "first last" co-occurrence. */
+/* Strict name-in-memo matcher.
+ *   • Full "first last" substring → always credit.
+ *   • Single token (first OR last name alone) → credit ONLY if that token is
+ *     unique across the active roster. Avoids the "memo says 'Ryan' so we
+ *     match all 3 Ryans" problem when the roster has duplicate first/last
+ *     names (Anthony × 3, Ryan × 3, Parker × 2, Dylan × 2, Mendez × 2 …).
+ *   • Tokens under 4 chars never count alone (too generic). */
 function memoMentionsRecruits_(memo, roster){
   if (!memo) return [];
   const memoN = ' ' + _normNameSlug_(memo) + ' ';
   if (!memoN.trim()) return [];
+
+  // Roster-wide ambiguity counts: how many active recruits share each first
+  // and last name token? Anything > 1 = not safe to credit on token alone.
+  const firstCounts = {}, lastCounts = {};
+  roster.forEach(r => {
+    const t = _rosterNameTokens_(r.name);
+    if (t.first) firstCounts[t.first] = (firstCounts[t.first] || 0) + 1;
+    if (t.last && t.last !== t.first) lastCounts[t.last] = (lastCounts[t.last] || 0) + 1;
+  });
+
   const found = {};
   roster.forEach(r => {
     const t = _rosterNameTokens_(r.name);
     if (!t.full) return;
-    // Most reliable: full "first last" substring match.
+
+    // Strongest: full "first last" substring — never ambiguous, always credit.
     if (t.full.length >= 5 && memoN.indexOf(' ' + t.full + ' ') >= 0){
       found[r.rid] = { rid: r.rid, name: r.name, strength: 'full' };
       return;
     }
-    // First name alone — only if it's distinctive (≥ 4 chars).
-    if (t.first.length >= 4 && memoN.indexOf(' ' + t.first + ' ') >= 0){
+
+    // First name alone — only if it appears AND is unique in the roster.
+    if (t.first.length >= 4 && firstCounts[t.first] === 1 &&
+        memoN.indexOf(' ' + t.first + ' ') >= 0){
       found[r.rid] = { rid: r.rid, name: r.name, strength: 'first' };
     }
-    // Last name alone — only if ≥ 4 chars and not a duplicate of the first-name hit.
-    if (t.last.length >= 4 && t.last !== t.first && memoN.indexOf(' ' + t.last + ' ') >= 0){
+
+    // Last name alone — only if it appears AND is unique in the roster.
+    if (t.last.length >= 4 && t.last !== t.first && lastCounts[t.last] === 1 &&
+        memoN.indexOf(' ' + t.last + ' ') >= 0){
       const ex = found[r.rid];
       found[r.rid] = { rid: r.rid, name: r.name, strength: (ex && ex.strength === 'first') ? 'both' : (ex ? ex.strength : 'last') };
     }
