@@ -51,6 +51,10 @@ function getDashboardData(){
     memo: e.memo || ''
   }));
 
+  // Possible-splits panel: every credited Venmo whose memo names another
+  // recruit. The dashboard surfaces these for one-click re-attribution.
+  const suggestions = splitSuggestions_();
+
   return {
     week: week, seasonWeeks: SEASON_WEEKS, closed: seasonClosed(),
     paused: isPaused_(),
@@ -61,6 +65,7 @@ function getDashboardData(){
     weeklyDues: WEEKLY_DUES, seasonTotal: TOTAL_PER_RECRUIT,
     moneyIn: { cash: round2_(cashIn), venmo: round2_(venmoIn), total: collected },
     kitty:   { collected: collected, spent: spent, balance: balance },
+    splitSuggestions: suggestions,
     rows: rows.map(r => {
       const paid = r.paid;
       const rawWeeks = Math.floor(paid / WEEKLY_DUES);
@@ -244,6 +249,15 @@ function dismissReviewWeb(row){
   if (row < 2 || row > sh.getLastRow()) return { ok: false, msg: 'Row no longer exists — refresh.' };
   sh.deleteRow(row);                                 // not a dues payment — remove it
   return { ok: true, msg: 'Dismissed.' };
+}
+
+/* Split an ALREADY-CREDITED payment (vs splitVenmoReviewWeb which only operates
+ * on rows in the Review queue). Same wire format: row + assignments list.
+ * Reuses splitVenmoReviewWeb under the hood since the underlying mechanics
+ * (validate sum, write split rows, delete original) are identical regardless
+ * of the original row's ReviewFlag. */
+function splitCreditedPaymentWeb(row, assignments){
+  return splitVenmoReviewWeb(row, assignments);
 }
 
 function nextSplitGroupId_(){ return 'S' + Utilities.formatDate(new Date(), TIMEZONE, 'yyyyMMdd-HHmmss-') + Math.floor(Math.random() * 900 + 100); }

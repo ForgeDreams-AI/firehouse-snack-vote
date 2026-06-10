@@ -279,3 +279,79 @@ function unpaidRecruits_(){ return recruitStatus_().filter(r => !r.paidThisWeek)
 /* ── Pause toggle ────────────────────────────────────────────────────────── */
 function isPaused_(){ return PropertiesService.getScriptProperties().getProperty(PROP_PAUSED) === 'true'; }
 function setPaused_(v){ PropertiesService.getScriptProperties().setProperty(PROP_PAUSED, v ? 'true' : 'false'); }
+
+/* ── Split-suggestion engine ─────────────────────────────────────────────── *
+ * Walks the Ledger looking at every credited Venmo payment that has a memo
+ * (column K). When the memo mentions roster recruits OTHER than the one the
+ * payment is currently credited to, surfaces it as a suggested split so the
+ * operator can re-attribute with one click. */
+
+function _normNameSlug_(s){
+  return String(s || '').toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function _rosterNameTokens_(fullName){
+  const norm = _normNameSlug_(fullName);
+  const parts = norm.split(' ').filter(p => p.length >= 2);
+  return { full: norm, first: parts[0] || '', last: parts[parts.length - 1] || '' };
+}
+
+/* Conservative name-in-memo matcher. Avoids false positives on short common
+ * tokens by requiring first-name length ≥ 4 OR a "first last" co-occurrence. */
+function memoMentionsRecruits_(memo, roster){
+  if (!memo) return [];
+  const memoN = ' ' + _normNameSlug_(memo) + ' ';
+  if (!memoN.trim()) return [];
+  const found = {};
+  roster.forEach(r => {
+    const t = _rosterNameTokens_(r.name);
+    if (!t.full) return;
+    // Most reliable: full "first last" substring match.
+    if (t.full.length >= 5 && memoN.indexOf(' ' + t.full + ' ') >= 0){
+      found[r.rid] = { rid: r.rid, name: r.name, strength: 'full' };
+      return;
+    }
+    // First name alone — only if it's distinctive (≥ 4 chars).
+    if (t.first.length >= 4 && memoN.indexOf(' ' + t.first + ' ') >= 0){
+      found[r.rid] = { rid: r.rid, name: r.name, strength: 'first' };
+    }
+    // Last name alone — only if ≥ 4 chars and not a duplicate of the first-name hit.
+    if (t.last.length >= 4 && t.last !== t.first && memoN.indexOf(' ' + t.last + ' ') >= 0){
+      const ex = found[r.rid];
+      found[r.rid] = { rid: r.rid, name: r.name, strength: (ex && ex.strength === 'first') ? 'both' : (ex ? ex.strength : 'last') };
+    }
+  });
+  return Object.keys(found).map(k => found[k]);
+}
+
+/* Returns the array of suggested splits. Each item:
+ *   { row, ts, creditedRid, creditedName, amount, payer, memo,
+ *     mentioned: [{ rid, name, strength }] }
+ * A row is suggested when at least one mentioned recruit ISN'T the credited
+ * one (so memo "Kendrick & Anthony" on a Kendrick-credited row → suggest;
+ * "Kendrick again" on a Kendrick-credited row → don't suggest). */
+function splitSuggestions_(){
+  const roster = activeRoster_();
+  const out = [];
+  getLedger_().forEach(e => {
+    if (e.review || !e.memo || !e.rid) return;
+    if (e.splitGroup) return;                                   // already split — skip
+    const mentioned = memoMentionsRecruits_(e.memo, roster);
+    if (!mentioned.length) return;
+    const others = mentioned.filter(m => m.rid !== e.rid);
+    if (!others.length) return;                                 // only mentions the credited recruit
+    out.push({
+      row: e.row,
+      ts: (e.ts instanceof Date ? e.ts.getTime() : Number(e.ts) || 0),
+      creditedRid: e.rid,
+      creditedName: e.name,
+      amount: e.amount,
+      payer: e.payer || e.name,
+      memo: e.memo,
+      mentioned: mentioned
+    });
+  });
+  return out;
+}
