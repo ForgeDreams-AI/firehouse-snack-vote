@@ -30,12 +30,12 @@ const ROS = { RID: 1, NAME: 2, EMAIL: 3, VENMO: 4, STATUS: 5, NOTES: 6 };
 /* v2 Ledger layout (10 cols). PayerName (G) and SplitGroupID (I) are new; this
  * pushes Source from G→H and the review flag from H→J versus v1. The automatic
  * migration in ensureSchema_() upgrades any existing v1 (8-col) Ledger in place. */
-const LED = { TS: 1, RID: 2, NAME: 3, METHOD: 4, AMOUNT: 5, WEEK: 6, PAYER: 7, SOURCE: 8, SPLIT: 9, REVIEW: 10 };
+const LED = { TS: 1, RID: 2, NAME: 3, METHOD: 4, AMOUNT: 5, WEEK: 6, PAYER: 7, SOURCE: 8, SPLIT: 9, REVIEW: 10, MEMO: 11 };
 
 const ROSTER_HEADERS = ['RecruitID', 'FullName', 'Email', 'VenmoHandle', 'Status', 'Notes'];
 // Column J keeps the v1 "Payment Status" wording; it IS the ReviewFlag column.
 const LEDGER_HEADERS = ['Timestamp', 'RecruitID', 'FullName', 'Method', 'Amount', 'WeekApplied',
-                        'PayerName', 'Source', 'SplitGroupID', 'Payment Status'];
+                        'PayerName', 'Source', 'SplitGroupID', 'Payment Status', 'Memo'];
 
 /* Expenses tab (Feature 3). Append-only, one row per line item.
  * Tax (H) + PurchaseTotal (I) are written ONCE per receipt, on the group's

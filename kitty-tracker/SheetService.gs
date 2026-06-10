@@ -32,15 +32,16 @@ function ensureSchema_(){
   if (!exp){ exp = ss.insertSheet(EXPENSES_TAB); exp.getRange(1, 1, 1, EXPENSES_HEADERS.length).setValues([EXPENSES_HEADERS]); }
 }
 
-/* Upgrade an existing Ledger to the v2 column layout.
- *   v1: TS RID Name Method Amount Week | Source | Review           (8 cols)
- *   v2: TS RID Name Method Amount Week | Payer Source Split Review  (10 cols)
- * We insert PayerName before old Source (col 7), then SplitGroupID before the
- * review flag — existing Source/Review cell data rides along to its new column. */
+/* Upgrade an existing Ledger to the current column layout.
+ *   v1:   TS RID Name Method Amount Week | Source | Review                       (8 cols)
+ *   v2:   TS RID Name Method Amount Week | Payer Source Split Review              (10 cols)
+ *   v2.1: TS RID Name Method Amount Week | Payer Source Split Review | Memo      (11 cols)
+ * Existing cell data rides along to its new column position; Memo is appended
+ * at the end so older rows simply get a blank Memo cell. */
 function migrateLedger_(sh){
   const width = sh.getLastColumn();
 
-  // Truly empty existing tab (no header) → just lay down v2 headers.
+  // Truly empty existing tab (no header) → just lay down current headers.
   if (sh.getLastRow() < 1 || width < 1){
     sh.getRange(1, 1, 1, LEDGER_HEADERS.length).setValues([LEDGER_HEADERS]);
     return;
@@ -49,9 +50,19 @@ function migrateLedger_(sh){
   const hdr = sh.getRange(1, 1, 1, Math.max(width, LEDGER_HEADERS.length)).getValues()[0];
   const h   = i => String(hdr[i] == null ? '' : hdr[i]).trim().toLowerCase();
 
-  // Already v2 (PayerName@G, Source@H, SplitGroupID@I) → re-assert exact header text, done.
-  if (h(LED.PAYER - 1) === 'payername' && h(LED.SOURCE - 1) === 'source' && h(LED.SPLIT - 1) === 'splitgroupid'){
+  // Already current (PayerName@G, Source@H, SplitGroupID@I, Memo@K) → re-assert header text, done.
+  if (h(LED.PAYER - 1) === 'payername' && h(LED.SOURCE - 1) === 'source' &&
+      h(LED.SPLIT - 1) === 'splitgroupid' && h(LED.MEMO - 1) === 'memo'){
     sh.getRange(1, 1, 1, LEDGER_HEADERS.length).setValues([LEDGER_HEADERS]);
+    return;
+  }
+
+  // v2 → v2.1: 10-col Ledger with PayerName/Source/SplitGroupID in place, no Memo.
+  // Just write the Memo header at col 11 — existing rows get blank Memo cells.
+  if (width === 10 && h(LED.PAYER - 1) === 'payername' && h(LED.SOURCE - 1) === 'source' && h(LED.SPLIT - 1) === 'splitgroupid'){
+    sh.getRange(1, LED.MEMO).setValue('Memo');
+    sh.getRange(1, 1, 1, LEDGER_HEADERS.length).setValues([LEDGER_HEADERS]);
+    Logger.log('Ledger migrated v2 (10-col) → v2.1 (11-col). Memo column added.');
     return;
   }
 
@@ -59,20 +70,22 @@ function migrateLedger_(sh){
   if (width <= 8 && h(6) === 'source'){
     sh.insertColumnBefore(7); sh.getRange(1, 7).setValue('PayerName');     // self-describe immediately so a
     sh.insertColumnBefore(9); sh.getRange(1, 9).setValue('SplitGroupID');  // partial run is still recoverable
+    sh.getRange(1, LED.MEMO).setValue('Memo');                              // v2.1 Memo appended
     sh.getRange(1, 1, 1, LEDGER_HEADERS.length).setValues([LEDGER_HEADERS]);
-    Logger.log('Ledger migrated v1 (8-col) → v2 (10-col). Existing Source/Review data preserved.');
+    Logger.log('Ledger migrated v1 (8-col) → v2.1 (11-col). Existing Source/Review data preserved.');
     return;
   }
 
   // Recovery: first insert landed (PayerName@G) but the run died before the second.
   if (width === 9 && h(6) === 'payername'){
     sh.insertColumnBefore(9); sh.getRange(1, 9).setValue('SplitGroupID');
+    sh.getRange(1, LED.MEMO).setValue('Memo');
     sh.getRange(1, 1, 1, LEDGER_HEADERS.length).setValues([LEDGER_HEADERS]);
-    Logger.log('Ledger half-migration recovered (added SplitGroupID).');
+    Logger.log('Ledger half-migration recovered (added SplitGroupID + Memo).');
     return;
   }
 
-  // Anything else: DON'T shuffle data. Only assert header text if already 10-wide.
+  // Anything else: DON'T shuffle data. Only assert header text if already wide enough.
   if (width >= LEDGER_HEADERS.length){
     sh.getRange(1, 1, 1, LEDGER_HEADERS.length).setValues([LEDGER_HEADERS]);
   } else {
@@ -149,7 +162,8 @@ function getLedger_(){
     payer: String(r[LED.PAYER - 1]).trim(),
     source: String(r[LED.SOURCE - 1]).trim(),
     splitGroup: String(r[LED.SPLIT - 1]).trim(),
-    review: isReview_(r[LED.REVIEW - 1])
+    review: isReview_(r[LED.REVIEW - 1]),
+    memo: String(r[LED.MEMO - 1] == null ? '' : r[LED.MEMO - 1]).trim()
   }));
 }
 // True when a ReviewFlag cell means "needs review" — understands the new
@@ -175,11 +189,12 @@ function processedSourceSet_(){
 }
 
 /* Append one payment row.
- * opts = { payer, splitGroup, weekApplied }  (all optional)
+ * opts = { payer, splitGroup, weekApplied, memo }  (all optional)
  *   payer       → PayerName col; defaults to the credited recruit's name.
  *   splitGroup  → shared SplitGroupID when one inbound payment is split.
  *   weekApplied → explicit WeekApplied text (e.g. "2,3,4" from the week-picker
- *                 or split UI). When omitted, computed from cumulative-after. */
+ *                 or split UI). When omitted, computed from cumulative-after.
+ *   memo        → Venmo note (the message the payer typed). Blank for cash. */
 function appendPayment_(rid, name, method, amount, source, review, opts){
   opts = opts || {};
   const after        = (cumulativeMap_()[rid] || 0) + (review ? 0 : amount);
@@ -194,10 +209,11 @@ function appendPayment_(rid, name, method, amount, source, review, opts){
 
   const payer = (opts.payer != null && String(opts.payer).trim()) ? String(opts.payer).trim() : name;
   const split = opts.splitGroup ? String(opts.splitGroup) : '';
+  const memo  = (opts.memo != null) ? String(opts.memo).trim() : '';
 
   sheet_(LEDGER_TAB).appendRow([
     nowStamp_(), rid, name, method, amount, weekApplied,
-    payer, source, split, review ? REVIEW_BAD : REVIEW_GOOD
+    payer, source, split, review ? REVIEW_BAD : REVIEW_GOOD, memo
   ]);
 }
 

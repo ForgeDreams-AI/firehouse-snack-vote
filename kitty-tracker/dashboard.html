@@ -199,6 +199,7 @@ function render(d){
     d.review.forEach(r => {
       h += '<div class="review">'
         +  '<b>'+esc(r.payer||r.name||'Unknown')+'</b> sent <b>'+money(r.amount)+'</b> via '+esc(r.method)+' <span class="sub">(row '+r.row+')</span>'
+        +  (r.memo ? '<div class="sub" style="margin-top:4px;color:var(--cream);font-style:italic">“'+esc(r.memo)+'”</div>' : '')
         +  '<div class="line"><select id="rv_'+r.row+'">'+rosterOptions()+'</select>'
         +    '<button class="go" onclick="assignReview('+r.row+')">Assign</button>'
         +    '<button onclick="openSplit('+r.row+','+r.amount+','+JSON.stringify(r.payer||r.name||'')+')">Split</button>'
@@ -223,9 +224,9 @@ function render(d){
 
   if(d.recent && d.recent.length){
     h += '<h1 style="margin-top:16px;font-size:14px">Recent Payments</h1>';
-    h += '<table><thead><tr><th>Time</th><th>Name</th><th>Payer</th><th>Method</th><th>Amount</th></tr></thead><tbody>';
+    h += '<table><thead><tr><th>Time</th><th>Name</th><th>Payer</th><th>Method</th><th>Amount</th><th>Note</th></tr></thead><tbody>';
     d.recent.forEach(r => {
-      h += '<tr><td>'+esc(fmtTs(r.ts))+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.payer||r.name)+'</td><td>'+esc(r.method)+'</td><td>'+money(r.amount)+'</td></tr>';
+      h += '<tr><td>'+esc(fmtTs(r.ts))+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.payer||r.name)+'</td><td>'+esc(r.method)+'</td><td>'+money(r.amount)+'</td><td class="sub" style="font-style:italic">'+esc(r.memo||'')+'</td></tr>';
     });
     h += '</tbody></table>';
   }
@@ -335,9 +336,9 @@ function renderDrill(res){
     + '<div class="chip"><span class="k">Weeks</span><br><span class="v">'+res.weeksCovered+'</span></div></div>';
   if(!res.rows.length){ h += '<p class="sub">No payments yet.</p>'; }
   else{
-    h += '<table><thead><tr><th>Time</th><th>Method</th><th>Amount</th><th>Week</th><th>Payer</th></tr></thead><tbody>';
+    h += '<table><thead><tr><th>Time</th><th>Method</th><th>Amount</th><th>Week</th><th>Payer</th><th>Note</th></tr></thead><tbody>';
     res.rows.forEach(p => {
-      h += '<tr><td>'+esc(fmtTs(p.ts))+'</td><td>'+esc(p.method)+'</td><td>'+money(p.amount)+'</td><td>'+esc(p.week)+'</td><td>'+esc(p.payer)+'</td></tr>';
+      h += '<tr><td>'+esc(fmtTs(p.ts))+'</td><td>'+esc(p.method)+'</td><td>'+money(p.amount)+'</td><td>'+esc(p.week)+'</td><td>'+esc(p.payer)+'</td><td class="sub" style="font-style:italic">'+esc(p.memo||'')+'</td></tr>';
     });
     h += '</tbody></table>';
   }

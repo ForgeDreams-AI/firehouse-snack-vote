@@ -36,18 +36,19 @@ function getDashboardData(){
     m[key] = (m[key] || 0) + e.amount;
   });
 
-  // Review queue — now carries the Venmo sender (payer) + amount so the split UI
-  // knows the received total to reconcile against.
+  // Review queue — now carries the Venmo sender (payer), amount, and the memo
+  // the payer typed so the operator has context before assigning/splitting.
   const review = ledger.filter(e => e.review).map(e => ({
     row: e.row, name: e.name, payer: e.payer || e.name, amount: e.amount,
-    method: e.method, source: e.source
+    method: e.method, source: e.source, memo: e.memo || ''
   }));
 
   // Recent payments log (newest first) — spot a Venmo that covered two people
   // (shared SplitGroupID) or one that came from someone else (payer ≠ name).
   const recent = ledger.slice().reverse().slice(0, 20).map(e => ({
     ts: (e.ts instanceof Date ? e.ts.getTime() : Number(e.ts)||0), name: e.name || 'Unknown', payer: e.payer || e.name,
-    method: e.method, amount: e.amount, split: e.splitGroup, review: e.review
+    method: e.method, amount: e.amount, split: e.splitGroup, review: e.review,
+    memo: e.memo || ''
   }));
 
   return {
@@ -73,7 +74,7 @@ function getDashboardData(){
       } else if (paid >= week * WEEKLY_DUES){
         const ahead = rawWeeks - week;
         kind  = ahead > 0 ? 'ahead' : 'current';
-        label = ahead > 0 ? ('Ahead ' + ahead + ' wk' + (ahead === 1 ? '' : 's')) : 'Current';
+        label = ahead > 0 ? ('Paid through wk ' + rawWeeks) : 'Current';
       } else {
         const late = week - rawWeeks;
         kind  = 'late';
@@ -157,7 +158,8 @@ function getRecruitPaymentsWeb(rid){
   const r = recruitById_(rid);
   const rows = getLedger_().filter(e => e.rid === rid && !e.review).map(e => ({
     ts: e.ts, method: e.method, amount: e.amount, week: e.week,
-    payer: e.payer || e.name, source: e.source, split: e.splitGroup
+    payer: e.payer || e.name, source: e.source, split: e.splitGroup,
+    memo: e.memo || ''
   }));
   let cash = 0, venmo = 0;
   rows.forEach(p => { if (p.method === 'Venmo') venmo += p.amount; else cash += p.amount; });
