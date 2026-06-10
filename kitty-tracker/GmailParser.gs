@@ -69,26 +69,33 @@ function extractVenmo_(subject, body){
   if (hM) handle = hM[1].toLowerCase();
 
   // Venmo note (the message the payer typed). Venmo's plain-text emails lay it
-  // out as:
+  // out roughly as:
   //     <Sender> paid you
   //     $X.XX
-  //     <the note>            ← this is what we want
+  //     [image: venmo logo]          ← HTML→text alt-text junk
+  //     <the note>                   ← this is what we want
   //     See transaction
   // so we scan a window after "paid you", skipping blanks, Venmo's section
-  // headers, lines that are just a dollar amount, and button/footer text.
-  const SKIP_PREFIX = /^(transfer|payment id|transaction|amount|date|note from|view|help|venmo|see transaction|money credited|view in app|reply|forward|©|unsubscribe)/i;
-  const AMOUNT_ONLY = /^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i;
+  // headers, lines that are just a dollar amount, image alt text, and button text.
+  const JUNK_PATTERNS = [
+    /^(transfer|payment id|transaction|amount|date|note from|view|help|venmo|see transaction|money credited|view in app|reply|forward|©|unsubscribe|open in app|hi |hello |dear )/i,
+    /^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i,                  // bare amount line
+    /^\[?\s*image\b/i,                                            // "image …", "[image: …]"
+    /\b(logo|icon|avatar|button|profile photo|profile picture)\s*\]?\s*$/i,  // ends with logo/icon/etc
+    /^\[\s*[a-z\s:]+\s*\]\s*$/i,                                  // pure bracketed alt text "[anything]"
+  ];
+  const isJunk = s => JUNK_PATTERNS.some(re => re.test(s));
   let memo = '';
   const lines = body.split(/\r?\n/).map(l => l.trim());
   for (let i = 0; i < lines.length - 1; i++){
     if (/paid you/i.test(lines[i])){
-      for (let j = i + 1; j < Math.min(lines.length, i + 12); j++){
+      for (let j = i + 1; j < Math.min(lines.length, i + 20); j++){
         let cand = lines[j];
         if (!cand) continue;
-        if (SKIP_PREFIX.test(cand)) continue;
-        if (AMOUNT_ONLY.test(cand)) continue;
+        if (isJunk(cand)) continue;
         cand = cand.replace(/^["“”'`]+|["“”'`]+$/g, '').trim();
         if (cand.length < 2 || cand.length > 280) continue;
+        if (isJunk(cand)) continue;                               // re-check post-strip
         memo = cand; break;
       }
       if (memo) break;
@@ -103,11 +110,39 @@ function extractVenmo_(subject, body){
 }
 
 // True when a stored memo cell looks like junk that should be replaced if the
-// re-scan produces a real one (e.g. just "$40.00" from a previous buggy parse).
+// re-scan produces a real one (e.g. just "$40.00" or "image venmo logo" left
+// over from an earlier buggy parse).
 function looksBogusMemo_(s){
   s = String(s || '').trim();
   if (!s) return false;                                          // empty is fine
-  return /^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i.test(s);      // pure amount
+  if (/^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i.test(s)) return true;     // pure amount
+  if (/^\[?\s*image\b/i.test(s)) return true;                              // image alt
+  if (/\b(logo|icon|avatar|button)\s*\]?\s*$/i.test(s)) return true;       // ends in logo etc
+  if (/^\[\s*[a-z\s:]+\s*\]\s*$/i.test(s)) return true;                    // pure bracketed
+  return false;
+}
+
+/* Debug helper: print what extractVenmo_ pulls from the latest 30 Venmo
+ * "paid you" emails. Doesn't write to the sheet — just logs to Executions so
+ * you can verify the memo extractor is grabbing the right line before running
+ * backfillFromEmails(). Run from the editor: function dropdown → previewVenmoMemos. */
+function previewVenmoMemos(){
+  const query = 'from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you")';
+  const threads = GmailApp.search(query, 0, 30);
+  const out = [];
+  threads.forEach(thread => {
+    thread.getMessages().forEach(msg => {
+      if (msg.getFrom().toLowerCase().indexOf('venmo') === -1) return;
+      const parsed = extractVenmo_(msg.getSubject(), msg.getPlainBody());
+      if (!parsed) return;
+      out.push('$' + parsed.amount.toFixed(2) +
+               '  from ' + (parsed.payer || '?') +
+               '  memo: ' + (parsed.memo || '(none)'));
+    });
+  });
+  const txt = out.length ? out.join('\n') : 'No Venmo emails found.';
+  Logger.log(txt);
+  return txt;
 }
 
 /* Match a parsed payment to a recruit. Handle first, then exact normalized
