@@ -36,7 +36,7 @@ function parseVenmoInbox(){
         parsed.amount,
         id,                                                    // Source = message-ID (idempotency key)
         !confident,                                            // ReviewFlag
-        { payer: parsed.payer || 'Unknown' }                  // PayerName = Venmo sender, ALWAYS recorded
+        { payer: parsed.payer || 'Unknown', memo: parsed.memo } // PayerName + Venmo note
       );
       processed[id] = true;
       touched = true;
@@ -68,7 +68,31 @@ function extractVenmo_(subject, body){
   const hM = hay.match(/@([A-Za-z0-9_-]{3,})/);
   if (hM) handle = hM[1].toLowerCase();
 
-  return { payer: payer, amount: amount, handle: handle };
+  // Venmo note (the message the payer typed). Venmo plain-text bodies usually
+  // put the note on the line right after "<Sender> paid you $X.XX", often wrapped
+  // in straight or smart quotes. Fall back to any "Note:" labelled line.
+  let memo = '';
+  const lines = body.split(/\r?\n/).map(l => l.trim());
+  for (let i = 0; i < lines.length - 1; i++){
+    if (/paid you/i.test(lines[i])){
+      // scan the next few lines for the first plausible note, skipping blanks
+      // and Venmo's own section headers ("Transfer Date", "Payment ID", etc.).
+      for (let j = i + 1; j < Math.min(lines.length, i + 6); j++){
+        let cand = lines[j];
+        if (!cand) continue;
+        if (/^(transfer|payment id|transaction|amount|date|note from|view|help|venmo)/i.test(cand)) continue;
+        cand = cand.replace(/^["“”'`]+|["“”'`]+$/g, '').trim();
+        if (cand && cand.length <= 280){ memo = cand; break; }
+      }
+      if (memo) break;
+    }
+  }
+  if (!memo){
+    const noteM = body.match(/note\s*[:\-]\s*(.{1,280})/i);
+    if (noteM) memo = noteM[1].split(/\r?\n/)[0].replace(/^["“”'`]+|["“”'`]+$/g, '').trim();
+  }
+
+  return { payer: payer, amount: amount, handle: handle, memo: memo };
 }
 
 /* Match a parsed payment to a recruit. Handle first, then exact normalized
@@ -154,6 +178,13 @@ function backfillFromEmails(){
           existing.payer = parsed.payer || existing.name || 'Unknown';
           filled++;
         }
+        // Backfill memo on existing rows that don't have one yet (e.g. rows
+        // ingested before the Memo column existed). Never overwrites.
+        if (parsed.memo && !existing.memo){
+          sh.getRange(existing.row, LED.MEMO).setValue(parsed.memo);
+          existing.memo = parsed.memo;
+          filled++;
+        }
       } else if (!processed){
         // Truly missed (thread never processed) → record once, parser's own rules.
         const match = matchRecruit_(parsed, roster);
@@ -163,9 +194,9 @@ function backfillFromEmails(){
           confident ? match.rid : '',
           confident ? match.name : '',
           'Venmo', parsed.amount, id, !confident,
-          { payer: parsed.payer || 'Unknown' }
+          { payer: parsed.payer || 'Unknown', memo: parsed.memo }
         );
-        bySource[id] = { row: -1, payer: parsed.payer || 'Unknown', name: '' };  // guard within this run
+        bySource[id] = { row: -1, payer: parsed.payer || 'Unknown', name: '', memo: parsed.memo || '' };  // guard within this run
         added++;
       }
       // (processed thread + unknown message-ID → leave alone; don't risk a double.)
