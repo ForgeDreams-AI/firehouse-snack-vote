@@ -346,18 +346,49 @@ function memoMentionsRecruits_(memo, roster){
   return Object.keys(found).map(k => found[k]);
 }
 
+/* Persistent dismissal store: a set of suggestion keys the operator has
+ * marked "Looks fine". Keyed by Gmail message-ID (source) when available so
+ * dismissals survive row reorders. Editor-run `resetDismissedSuggestions()`
+ * clears the lot. */
+const PROP_DISMISSED = 'KITTY_DISMISSED_SUGGESTIONS';
+function suggestionKey_(e){
+  return e.source ? ('src:' + e.source) : ('row:' + e.row + ':' + e.amount);
+}
+function getDismissedSuggestions_(){
+  const raw = PropertiesService.getScriptProperties().getProperty(PROP_DISMISSED);
+  if (!raw) return {};
+  try {
+    const arr = JSON.parse(raw);
+    const set = {};
+    arr.forEach(k => { set[k] = true; });
+    return set;
+  } catch (e){ return {}; }
+}
+function addDismissedSuggestion_(key){
+  const d = getDismissedSuggestions_();
+  d[key] = true;
+  PropertiesService.getScriptProperties().setProperty(PROP_DISMISSED, JSON.stringify(Object.keys(d)));
+}
+function resetDismissedSuggestions(){
+  PropertiesService.getScriptProperties().deleteProperty(PROP_DISMISSED);
+  return 'All "Looks fine" dismissals cleared — the panel will surface them again on next refresh.';
+}
+
 /* Returns the array of suggested splits. Each item:
- *   { row, ts, creditedRid, creditedName, amount, payer, memo,
+ *   { row, ts, source, creditedRid, creditedName, amount, payer, memo,
  *     mentioned: [{ rid, name, strength }] }
  * A row is suggested when at least one mentioned recruit ISN'T the credited
  * one (so memo "Kendrick & Anthony" on a Kendrick-credited row → suggest;
- * "Kendrick again" on a Kendrick-credited row → don't suggest). */
+ * "Kendrick again" on a Kendrick-credited row → don't suggest).
+ * Rows the operator has dismissed via "Looks fine" are filtered out. */
 function splitSuggestions_(){
   const roster = activeRoster_();
+  const dismissed = getDismissedSuggestions_();
   const out = [];
   getLedger_().forEach(e => {
     if (e.review || !e.memo || !e.rid) return;
     if (e.splitGroup) return;                                   // already split — skip
+    if (dismissed[suggestionKey_(e)]) return;                   // operator said "Looks fine"
     const mentioned = memoMentionsRecruits_(e.memo, roster);
     if (!mentioned.length) return;
     const others = mentioned.filter(m => m.rid !== e.rid);
@@ -365,6 +396,7 @@ function splitSuggestions_(){
     out.push({
       row: e.row,
       ts: (e.ts instanceof Date ? e.ts.getTime() : Number(e.ts) || 0),
+      source: e.source || '',
       creditedRid: e.rid,
       creditedName: e.name,
       amount: e.amount,

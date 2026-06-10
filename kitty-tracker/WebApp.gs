@@ -260,5 +260,14 @@ function splitCreditedPaymentWeb(row, assignments){
   return splitVenmoReviewWeb(row, assignments);
 }
 
+/* Persistently dismiss a Possible-Splits suggestion ("Looks fine"). Keyed by
+ * Gmail message-ID when available so the dismissal survives row deletions and
+ * sheet reorders. Run resetDismissedSuggestions() from the editor to clear all. */
+function dismissSuggestionWeb(row, source, amount){
+  const key = source ? ('src:' + source) : ('row:' + row + ':' + (amount || 0));
+  addDismissedSuggestion_(key);
+  return { ok: true, msg: 'Dismissed. Run resetDismissedSuggestions() in the editor to bring back.' };
+}
+
 function nextSplitGroupId_(){ return 'S' + Utilities.formatDate(new Date(), TIMEZONE, 'yyyyMMdd-HHmmss-') + Math.floor(Math.random() * 900 + 100); }
 function getDashHtml(){return HtmlService.createHtmlOutputFromFile("dashboard").getContent();}
