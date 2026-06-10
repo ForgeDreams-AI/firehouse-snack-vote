@@ -415,12 +415,15 @@ function openSuggestSplit(idx){
 }
 
 function dismissSuggestion(idx){
-  // Local-only dismissal: just remove the card from the current view. A page
-  // refresh brings it back — meant for "I'll deal with this later", not
-  // permanent dismissal. To permanently dismiss, clear the memo in column K.
-  const cards = document.querySelectorAll('.suggest');
-  if(cards[idx]) cards[idx].remove();
-  toast('Hidden until next refresh. Clear memo in column K to dismiss permanently.');
+  const s = (DATA && DATA.splitSuggestions || [])[idx];
+  if(!s) return;
+  if(!confirm('Hide this suggestion permanently?\n\n"'+(s.memo||'')+'"\n\n(Run resetDismissedSuggestions() in the Apps Script editor to bring all dismissals back.)')) return;
+  google.script.run.withSuccessHandler(r => {
+    const cards = document.querySelectorAll('.suggest');
+    if(cards[idx]) cards[idx].remove();
+    toast(r && r.msg ? 'Dismissed.' : 'Dismissed.');
+  }).withFailureHandler(e => toast('Error: '+(e&&e.message?e.message:e)))
+    .dismissSuggestionWeb(s.row, s.source||'', s.amount||0);
 }
 function closeSplit(){ hide('split'); }
 function addSplitLine(){
