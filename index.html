@@ -165,6 +165,7 @@ body{
 .thumbs{display:flex;gap:8px;flex-wrap:wrap;}
 .thumb{position:relative;}
 .thumb img{width:84px;height:112px;border-radius:10px;border:2px solid var(--line);object-fit:cover;display:block;}
+.pdfthumb{width:84px;height:112px;border-radius:10px;border:2px solid var(--line);background:var(--char);display:grid;place-items:center;font-family:'Oswald';font-weight:600;font-size:13px;color:var(--mut);}
 .thumbx{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:2px solid var(--char);
   background:var(--red);color:#fff;font-size:13px;font-weight:700;line-height:1;cursor:pointer;}
 .thumbn{position:absolute;bottom:4px;left:4px;background:rgba(21,23,27,.85);color:var(--cream);font-size:11px;
@@ -266,6 +267,7 @@ let rcBusy = false;      // OCR running
 let rcSubmitting = false;
 let rcDone = false;      // a receipt was just submitted (show confirmation)
 let tesseractPromise = null;
+let pdfjsPromise = null;
 
 /* ---------- tiny config guards ---------- */
 function isSet(url){ return url && url.indexOf("PASTE_") === -1; }
@@ -1007,8 +1009,8 @@ function renderReceipts(){
   const addMore = rcPhotos.length > 0;
   h += `<div id="rc-drop" class="drop">
       <div class="big">📁 ${addMore ? 'Add another file (page ' + (rcPhotos.length + 1) + ')' : 'Tap to upload a receipt'}</div>
-      <div class="sm">Pick a receipt image from your files. Long receipt? Add several files top-to-bottom — overlap between them is removed automatically. You can choose more than one at once. JPG/PNG/HEIC.</div>
-      <input id="rc-file" type="file" accept="image/*" multiple class="hide">
+      <div class="sm"><b>PDF works best</b> (read exactly, no guessing) — e.g. the Costco app's receipt. Photos work too but are less accurate. Long receipt? Add several files; overlap is removed automatically. PDF/JPG/PNG/HEIC.</div>
+      <input id="rc-file" type="file" accept="application/pdf,image/*" multiple class="hide">
     </div>`;
 
   // Photo strip + OCR progress
@@ -1017,7 +1019,8 @@ function renderReceipts(){
     if (rcPhotos.length){
       h += `<div class="thumbs">`;
       rcPhotos.forEach((p, i) => {
-        h += `<div class="thumb"><img src="${p.url}" alt="page ${i + 1}"><button class="thumbx" type="button" data-photo="${i}" title="Remove this photo">×</button><span class="thumbn">${i + 1}</span></div>`;
+        const face = p.url ? `<img src="${p.url}" alt="page ${i + 1}">` : `<div class="pdfthumb">📄 PDF</div>`;
+        h += `<div class="thumb">${face}<button class="thumbx" type="button" data-photo="${i}" title="Remove this file">×</button><span class="thumbn">${i + 1}</span></div>`;
       });
       h += `</div>`;
     }
@@ -1202,44 +1205,94 @@ function ensureTesseract(){
   return tesseractPromise;
 }
 
+function isPdfFile(f){ return f && (/pdf/i.test(f.type) || /\.pdf$/i.test(f.name || '')); }
 function isImageFile(f){
   return f && (/^image\//.test(f.type) || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name || ''));
 }
+function isReceiptFile(f){ return isPdfFile(f) || isImageFile(f); }
 
-/* Read one or more photos of the SAME receipt. Each is OCR'd in turn and its
-   line items are merged onto the running list, with the overlapping region
-   between consecutive photos detected and dropped (see mergeReceiptLines). */
+/* Load pdf.js (CDN) on first use, for reading the text layer out of PDF receipts. */
+function ensurePdfjs(){
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfjsPromise) return pdfjsPromise;
+  pdfjsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+    s.onload = () => {
+      if (!window.pdfjsLib) return reject(new Error('pdf.js failed to load'));
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      resolve(window.pdfjsLib);
+    };
+    s.onerror = () => reject(new Error('Could not load the PDF reader (offline?)'));
+    document.head.appendChild(s);
+  });
+  return pdfjsPromise;
+}
+
+/* Pull the text out of a PDF's text layer, rebuilding one line per receipt row
+   (group by y, order by x, add a space across big x-gaps). No OCR needed. */
+async function pdfToText(file){
+  const lib = await ensurePdfjs();
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  const lines = [];
+  for (let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const byRow = {};
+    tc.items.forEach(it => {
+      if (!it.str) return;
+      const y = Math.round(it.transform[5]);
+      (byRow[y] || (byRow[y] = [])).push({ x: it.transform[4], w: it.width || 0, s: it.str });
+    });
+    Object.keys(byRow).map(Number).sort((a, b) => b - a).forEach(y => {
+      const parts = byRow[y].sort((a, b) => a.x - b.x);
+      let line = '', prevEnd = null;
+      parts.forEach(pt => {
+        if (prevEnd != null && pt.x - prevEnd > 1) line += ' ';
+        line += pt.s;
+        prevEnd = pt.x + pt.w;
+      });
+      lines.push(line);
+    });
+  }
+  return lines.join('\n');
+}
+
+/* Read one or more files for the SAME receipt (PDF text layer, or photo via OCR).
+   Each file's line items are merged onto the running list, with the overlapping
+   region between consecutive pages detected and dropped (see mergeReceiptLines). */
 async function handleReceiptFiles(fileList){
-  const files = Array.from(fileList).filter(isImageFile);
-  if (!files.length){ showToast('Please choose image file(s)'); return; }
+  const files = Array.from(fileList).filter(isReceiptFile);
+  if (!files.length){ showToast('Please choose a PDF or image receipt'); return; }
 
   rcDone = false;
   rcBusy = true;
-  rcStatus = 'Loading OCR…';
+  rcStatus = 'Reading…';
   renderReceipts();
 
-  let T;
-  try { T = await ensureTesseract(); }
-  catch (e){
-    rcBusy = false;
-    rcStatus = 'OCR failed: ' + e.message + ' — you can still enter items by hand.';
-    if (!rcLines.length) rcLines = [{ item: '', qty: 1, price: '', category: CATEGORY_ORDER[0] || '' }];
-    renderReceipts();
-    return;
-  }
+  let T = null;  // Tesseract is loaded lazily, only if an image needs OCR
 
   let addedTotal = 0, droppedTotal = 0, failed = 0;
   for (let n = 0; n < files.length; n++){
     const file = files[n];
-    rcPhotos.push({ name: file.name || ('receipt-' + rcPhotos.length + '.jpg'), url: URL.createObjectURL(file) });
+    const pdf = isPdfFile(file);
+    rcPhotos.push({ name: file.name || ('receipt-' + rcPhotos.length), url: pdf ? '' : URL.createObjectURL(file), pdf: pdf });
     const pageNo = rcPhotos.length;
-    rcStatus = 'Reading photo ' + pageNo + '…';
+    rcStatus = (pdf ? 'Reading PDF ' : 'Reading photo ') + pageNo + '…';
     renderReceipts();
     try {
-      const { data } = await T.recognize(file, 'eng', {
-        logger: m => { if (m.status === 'recognizing text') setOcrProgress(m.progress, 'Reading photo ' + pageNo + '… ' + Math.round(m.progress * 100) + '%'); }
-      });
-      const parsed = parseReceiptText(data && data.text ? data.text : '');
+      let textOut = '';
+      if (pdf){
+        textOut = await pdfToText(file);
+      } else {
+        if (!T) T = await ensureTesseract();
+        const { data } = await T.recognize(file, 'eng', {
+          logger: m => { if (m.status === 'recognizing text') setOcrProgress(m.progress, 'Reading photo ' + pageNo + '… ' + Math.round(m.progress * 100) + '%'); }
+        });
+        textOut = data && data.text ? data.text : '';
+      }
+      const parsed = parseReceiptText(textOut);
       const merged = mergeReceiptLines(rcLines, parsed);
       addedTotal += merged.added;
       droppedTotal += merged.dropped;
@@ -1253,11 +1306,11 @@ async function handleReceiptFiles(fileList){
     rcStatus = "Couldn't pick out line items automatically — add them by hand below.";
   } else {
     rcStatus = rcLines.length + ' item' + (rcLines.length === 1 ? '' : 's')
-      + (rcPhotos.length > 1 ? ' from ' + rcPhotos.length + ' photos' : '')
+      + (rcPhotos.length > 1 ? ' from ' + rcPhotos.length + ' files' : '')
       + (droppedTotal ? ' · ' + droppedTotal + ' overlapping row' + (droppedTotal === 1 ? '' : 's') + ' removed' : '')
       + ' — check them below.';
   }
-  if (failed) rcStatus += ' (' + failed + ' photo' + (failed === 1 ? '' : 's') + " couldn't be read)";
+  if (failed) rcStatus += ' (' + failed + ' file' + (failed === 1 ? '' : 's') + " couldn't be read)";
   renderReceipts();
 }
 
@@ -1295,44 +1348,31 @@ function setOcrProgress(p, msg){
   if (st && msg) st.textContent = msg;
 }
 
-/* Heuristic receipt parser. Pulls "<name> ... <price>" lines, drops the
-   subtotal/tax/total/payment noise, and guesses qty from "2 @"/"2 x" patterns.
-   Whatever it gets wrong, the review table lets the crew fix in seconds. */
+/* Warehouse-receipt parser (tuned for Costco-style: "<flag> <item-code> NAME <price> <dept>").
+   Drops the subtotal/tax/total/payment/savings noise and the "code / code  9.99-"
+   instant-savings lines. Each item's printed price is its line total; qty is left at 1
+   for the crew to bump in the review table. Tolerant of OCR/PDF text that loses the
+   spaces between words. */
 function parseReceiptText(text){
-  const SKIP = /\b(sub\s*total|subtotal|total|tax|hst|gst|pst|vat|balance|change|cash|debit|credit|visa|master|amex|tender|approved|auth|ref|aid|account|card|terminal|store|tel|phone|receipt|cashier|reg(ister)?|invoice|order|date|time|thank|welcome|member|points|savings|loyalty|qty)\b/i;
+  const SKIP = /\b(sub\s*total|subtotal|total|tax|hst|gst|pst|vat|amount|balance|change|cash|debit|credit|visa|master|amex|tend|tender|approv|auth|ref|aid|account|card|terminal|store|tel|phone|receipt|cashier|reg(ister)?|invoice|order|date|time|thank|welcome|member|points|saving|loyalty|qty|whse|wholesale|costco|instant|sold|number of items|purchase|survey|chip)\b/i;
   const out = [];
   String(text || '').split(/\r?\n/).forEach(raw => {
     let line = raw.replace(/\s+/g, ' ').trim();
     if (line.length < 3) return;
-    // find a price near the end: 1.99 / 12.50 / $3.00 (allow trailing letters like T/F tax flags)
-    const pm = line.match(/(?:\$\s*)?(\d{1,4}[.,]\d{2})(?:\s*[A-Z]{1,2})?\s*$/);
+    if (/^\d{3,}\s*\/\s*\d{3,}/.test(line)) return;     // "378601 / 1761722 22.40-" instant-savings line
+    if (/-\s*$/.test(line)) return;                     // any trailing-minus (discount/credit)
+    if (SKIP.test(line)) return;
+    // trailing price, optionally followed by a 1–2 digit department/tax code (e.g. "71.96 3")
+    const pm = line.match(/(?:\$\s*)?(\d{1,4}[.,]\d{2})(?:\s+\d{1,2})?\s*$/);
     if (!pm) return;
-    const lineTotal = parseFloat(pm[1].replace(',', '.'));
+    const price = parseFloat(pm[1].replace(',', '.'));
+    if (!(price > 0) || price > 900) return;
     let name = line.slice(0, pm.index).trim();
-    // strip leading item codes / UPCs / leading symbols
-    name = name.replace(/^\d{5,}\s+/, '').replace(/^[#*]+\s*/, '').trim();
-    let qty = 1, unit = lineTotal;
-    // "N @ U.UU" anywhere → N units at unit price U; the trailing number is the line total
-    const at = name.match(/(\d{1,3})\s*@\s*\$?(\d{1,4}[.,]\d{2})/);
-    if (at){
-      qty = parseInt(at[1], 10) || 1;
-      unit = parseFloat(at[2].replace(',', '.'));
-      name = (name.slice(0, at.index) + ' ' + name.slice(at.index + at[0].length)).trim();
-    } else {
-      // leading quantity: "2 x Item", "2X Item", or "2 Item"
-      const qm = name.match(/^(\d{1,3})\s*[xX]\s+/) || name.match(/^(\d{1,3})\s+(?=[A-Za-z])/);
-      if (qm){
-        qty = parseInt(qm[1], 10) || 1;
-        name = name.slice(qm[0].length).trim();
-        if (qty > 1 && lineTotal / qty >= 0.25) unit = +(lineTotal / qty).toFixed(2); // split total into per-unit
-      }
-    }
-    name = name.replace(/[^A-Za-z0-9 &'./-]/g, '').replace(/\s+/g, ' ').trim();
-    if (!name || name.length < 2) return;
-    if (SKIP.test(line) || SKIP.test(name)) return;
-    if (!/[A-Za-z]/.test(name)) return;        // need at least some letters
-    if (unit <= 0 || unit > 999) return;
-    out.push({ item: titleCase(name), qty, price: unit, category: guessCategory(name) });
+    name = name.replace(/^[EANF]\s*/, '').replace(/^[#*]+\s*/, '').replace(/^\d{1,7}\s*/, ''); // tax flag + item code (space optional)
+    name = name.replace(/[^A-Za-z0-9 &.'\/-]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (name.length < 2 || !/[A-Za-z]/.test(name)) return;
+    if (SKIP.test(name)) return;
+    out.push({ item: name, qty: 1, price: price, category: guessCategory(name) });
   });
   return out;
 }
