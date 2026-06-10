@@ -68,21 +68,28 @@ function extractVenmo_(subject, body){
   const hM = hay.match(/@([A-Za-z0-9_-]{3,})/);
   if (hM) handle = hM[1].toLowerCase();
 
-  // Venmo note (the message the payer typed). Venmo plain-text bodies usually
-  // put the note on the line right after "<Sender> paid you $X.XX", often wrapped
-  // in straight or smart quotes. Fall back to any "Note:" labelled line.
+  // Venmo note (the message the payer typed). Venmo's plain-text emails lay it
+  // out as:
+  //     <Sender> paid you
+  //     $X.XX
+  //     <the note>            ← this is what we want
+  //     See transaction
+  // so we scan a window after "paid you", skipping blanks, Venmo's section
+  // headers, lines that are just a dollar amount, and button/footer text.
+  const SKIP_PREFIX = /^(transfer|payment id|transaction|amount|date|note from|view|help|venmo|see transaction|money credited|view in app|reply|forward|©|unsubscribe)/i;
+  const AMOUNT_ONLY = /^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i;
   let memo = '';
   const lines = body.split(/\r?\n/).map(l => l.trim());
   for (let i = 0; i < lines.length - 1; i++){
     if (/paid you/i.test(lines[i])){
-      // scan the next few lines for the first plausible note, skipping blanks
-      // and Venmo's own section headers ("Transfer Date", "Payment ID", etc.).
-      for (let j = i + 1; j < Math.min(lines.length, i + 6); j++){
+      for (let j = i + 1; j < Math.min(lines.length, i + 12); j++){
         let cand = lines[j];
         if (!cand) continue;
-        if (/^(transfer|payment id|transaction|amount|date|note from|view|help|venmo)/i.test(cand)) continue;
+        if (SKIP_PREFIX.test(cand)) continue;
+        if (AMOUNT_ONLY.test(cand)) continue;
         cand = cand.replace(/^["“”'`]+|["“”'`]+$/g, '').trim();
-        if (cand && cand.length <= 280){ memo = cand; break; }
+        if (cand.length < 2 || cand.length > 280) continue;
+        memo = cand; break;
       }
       if (memo) break;
     }
@@ -93,6 +100,14 @@ function extractVenmo_(subject, body){
   }
 
   return { payer: payer, amount: amount, handle: handle, memo: memo };
+}
+
+// True when a stored memo cell looks like junk that should be replaced if the
+// re-scan produces a real one (e.g. just "$40.00" from a previous buggy parse).
+function looksBogusMemo_(s){
+  s = String(s || '').trim();
+  if (!s) return false;                                          // empty is fine
+  return /^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i.test(s);      // pure amount
 }
 
 /* Match a parsed payment to a recruit. Handle first, then exact normalized
@@ -179,8 +194,9 @@ function backfillFromEmails(){
           filled++;
         }
         // Backfill memo on existing rows that don't have one yet (e.g. rows
-        // ingested before the Memo column existed). Never overwrites.
-        if (parsed.memo && !existing.memo){
+        // ingested before the Memo column existed). Also replace memos that
+        // look like junk left over from a previous buggy parse (e.g. "$40.00").
+        if (parsed.memo && (!existing.memo || looksBogusMemo_(existing.memo))){
           sh.getRange(existing.row, LED.MEMO).setValue(parsed.memo);
           existing.memo = parsed.memo;
           filled++;
