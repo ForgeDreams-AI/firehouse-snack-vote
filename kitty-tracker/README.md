@@ -55,11 +55,20 @@ deployed — they're saved here verbatim for backup.
 3. Save. **Deploy → Manage deployments → Edit → New version → Deploy** (keep the
    same `/exec` URL).
 
-## Using the Review queue (assigning payments)
-A Venmo receipt auto-credits the matched recruit only when it's **$20 or under**
-(one week's dues). Anything **over $20** is held in **Needs Review** so you can
-confirm/split it before it counts. Payments the parser couldn't match to a
-recruit also land here.
+## How Venmo payments get credited
+The parser reads the **note** on each Venmo receipt to decide who gets credited:
+- **Paying for yourself** — the note is empty/generic, so the payment is credited
+  to whoever the **sender** matches on the roster (handle or name).
+- **Paying for someone else** — the note clearly names **one** recruit (e.g.
+  "Jake's week 3"), so that recruit is credited and the actual sender is kept as
+  the **PayerName** ("paid by …"). The note wins over the sender here.
+- **Note names two+ recruits**, or no one clearly → held in **Needs Review** so
+  you can assign/split it by hand.
+
+On top of that, a receipt only **auto-credits** when it's **$20 or under** (one
+week's dues). Anything **over $20** is always held in **Needs Review** so you can
+confirm/split it (multi-week or shared payments) before it counts. Payments the
+parser couldn't match to a recruit also land here.
 
 Venmo payments that need a human show up under **Needs Review**:
 - **Assign** — pick the recruit in the dropdown, click **Assign**. Credits them, clears the review.

@@ -145,9 +145,24 @@ function previewVenmoMemos(){
   return txt;
 }
 
-/* Match a parsed payment to a recruit. Handle first, then exact normalized
+/* Match a parsed payment to a recruit.
+ * The Venmo NOTE wins: when someone pays for someone else, the recipient's name
+ * is in the note, not the sender. So we read the note first —
+ *   • note clearly names exactly ONE recruit → credit that recruit
+ *   • note names TWO+ recruits → no auto-match (let the review/split flow handle it)
+ *   • note names no one clearly → fall through to sender matching below.
+ * Sender matching (the "paying for self" path): handle, then exact normalized
  * name, then last-name + first-initial. Anything looser -> no match (review). */
 function matchRecruit_(parsed, roster){
+  // 0) Note wins. memoMentionsRecruits_ already enforces strict rules (full name,
+  //    or a roster-unique first/last token ≥4 chars), so a single hit is safe to
+  //    credit; multiple hits mean it's a split → send to review.
+  if (parsed.memo){
+    const mentioned = memoMentionsRecruits_(parsed.memo, roster);
+    if (mentioned.length === 1) return recruitById_(mentioned[0].rid) || mentioned[0];
+    if (mentioned.length > 1) return null;                       // names 2+ recruits → review/split
+  }
+
   if (parsed.handle){
     const byH = roster.filter(r => r.venmo && r.venmo === parsed.handle)[0];
     if (byH) return byH;
