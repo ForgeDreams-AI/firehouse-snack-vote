@@ -26,7 +26,7 @@ function parseVenmoInbox(){
       if (!parsed) return;                                     // not a payment-received email
 
       const match = matchRecruit_(parsed, roster);
-      const amountOk = parsed.amount > 0 && parsed.amount <= AUTO_CREDIT_MAX;
+      const amountOk = isWholeWeeks_(parsed.amount);
       const confident = match && amountOk;
 
       appendPayment_(
@@ -145,6 +145,16 @@ function previewVenmoMemos(){
   return txt;
 }
 
+/* True when an amount is a clean whole-week prepay we can auto-credit: a positive
+ * whole-number multiple of one week's dues ($20, $40, $60 …) that doesn't exceed
+ * the full season total. Anything else — odd amounts ($30, $50, $70) or more than
+ * the season total — returns false so the payment lands in the review queue. */
+function isWholeWeeks_(amount){
+  if (!(amount > 0) || amount > TOTAL_PER_RECRUIT) return false;
+  const weeks = amount / WEEKLY_DUES;
+  return Math.abs(weeks - Math.round(weeks)) < 0.005;   // clean multiple of WEEKLY_DUES
+}
+
 /* Match a parsed payment to a recruit.
  * The Venmo NOTE wins: when someone pays for someone else, the recipient's name
  * is in the note, not the sender. So we read the note first —
@@ -254,7 +264,7 @@ function backfillFromEmails(){
       } else if (!processed){
         // Truly missed (thread never processed) → record once, parser's own rules.
         const match = matchRecruit_(parsed, roster);
-        const amountOk = parsed.amount > 0 && parsed.amount <= AUTO_CREDIT_MAX;
+        const amountOk = isWholeWeeks_(parsed.amount);
         const confident = match && amountOk;
         appendPayment_(
           confident ? match.rid : '',

@@ -65,10 +65,11 @@ The parser reads the **note** on each Venmo receipt to decide who gets credited:
 - **Note names two+ recruits**, or no one clearly → held in **Needs Review** so
   you can assign/split it by hand.
 
-On top of that, a receipt only **auto-credits** when it's **$20 or under** (one
-week's dues). Anything **over $20** is always held in **Needs Review** so you can
-confirm/split it (multi-week or shared payments) before it counts. Payments the
-parser couldn't match to a recruit also land here.
+On top of that, a receipt only **auto-credits** when the amount is a **clean
+whole-week multiple of $20** — $20, $40, $60 … up to the $300 season total. Odd
+amounts that don't divide evenly ($30, $50, $70) and anything over the season
+total are held in **Needs Review** so you can confirm/split them before they
+count. Payments the parser couldn't match to a recruit also land here.
 
 Venmo payments that need a human show up under **Needs Review**:
 - **Assign** — pick the recruit in the dropdown, click **Assign**. Credits them, clears the review.
