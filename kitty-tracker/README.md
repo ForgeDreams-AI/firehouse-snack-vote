@@ -77,6 +77,21 @@ Venmo payments that need a human show up under **Needs Review**:
 - **Dismiss** — removes a row that isn't a dues payment.
 - Person missing from the dropdown? Add them to the **Roster** tab (or via the sign-up Form) and refresh.
 
+## Re-running Venmo under new rules
+Changed the crediting rules and want them applied to recent payments? In the
+Apps Script editor run **`reprocessRecentVenmo`** (function dropdown → Run).
+It:
+- **Backs up the whole Ledger first** to a timestamped `Ledger_bak_…` tab (so
+  it's fully reversible — delete the Ledger and rename the backup back).
+- Re-reads the last **14 days** of Venmo receipts and rebuilds those rows under
+  the current rules (note-wins matching + whole-week auto-credit).
+- **Leaves all cash and manually-entered rows alone** — only email-derived Venmo
+  rows in the window are redone.
+
+Pass a different window in days, e.g. `reprocessRecentVenmo(30)`. A receipt you'd
+previously hand-split or dismissed will be re-evaluated from scratch (the old
+version is preserved in the backup tab).
+
 ## Setup notes (for reference)
 - Run `setupKitty()` once to create/upgrade tabs (Roster, Ledger, Expenses) and
   back-fill from Venmo emails.
