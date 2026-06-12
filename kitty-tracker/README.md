@@ -56,7 +56,12 @@ deployed — they're saved here verbatim for backup.
    same `/exec` URL).
 
 ## Using the Review queue (assigning payments)
-Venmo payments the parser couldn't match show up under **Needs Review**:
+A Venmo receipt auto-credits the matched recruit only when it's **$20 or under**
+(one week's dues). Anything **over $20** is held in **Needs Review** so you can
+confirm/split it before it counts. Payments the parser couldn't match to a
+recruit also land here.
+
+Venmo payments that need a human show up under **Needs Review**:
 - **Assign** — pick the recruit in the dropdown, click **Assign**. Credits them, clears the review.
 - **Split** — one payment that covered several recruits: click **Split**, **+ Add recruit** for each, enter amounts (and optional weeks like `1,2`); the **Remaining** must read `$0.00 ✓ balanced`, then **Save split**.
 - **Dismiss** — removes a row that isn't a dues payment.

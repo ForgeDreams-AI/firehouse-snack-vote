@@ -26,7 +26,7 @@ function parseVenmoInbox(){
       if (!parsed) return;                                     // not a payment-received email
 
       const match = matchRecruit_(parsed, roster);
-      const amountOk = parsed.amount > 0 && parsed.amount <= MAX_PREPAY;
+      const amountOk = parsed.amount > 0 && parsed.amount <= AUTO_CREDIT_MAX;
       const confident = match && amountOk;
 
       appendPayment_(
@@ -239,7 +239,7 @@ function backfillFromEmails(){
       } else if (!processed){
         // Truly missed (thread never processed) → record once, parser's own rules.
         const match = matchRecruit_(parsed, roster);
-        const amountOk = parsed.amount > 0 && parsed.amount <= MAX_PREPAY;
+        const amountOk = parsed.amount > 0 && parsed.amount <= AUTO_CREDIT_MAX;
         const confident = match && amountOk;
         appendPayment_(
           confident ? match.rid : '',

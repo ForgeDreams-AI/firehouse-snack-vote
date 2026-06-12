@@ -52,7 +52,7 @@ const REVIEW_BAD  = 'Payment Bad!';    // couldn't match — shows in the dashbo
 /* ── Gmail / parsing ─────────────────────────────────────────────────────── */
 const VENMO_SENDER    = 'venmo@venmo.com';
 const PROCESSED_LABEL = 'KittyProcessed';   // applied to Venmo emails we've recorded
-const MAX_PREPAY      = TOTAL_PER_RECRUIT;  // payments over this -> review queue
+const AUTO_CREDIT_MAX = WEEKLY_DUES;        // Venmo at or under this ($20) auto-credits the matched recruit; anything over -> review queue
 
 /* ── Receipts / reporting (Feature 3) ────────────────────────────────────── */
 const RECEIPT_FOLDER_NAME = 'PHX FD Kitty Receipts';   // Drive folder for uploaded receipt files
