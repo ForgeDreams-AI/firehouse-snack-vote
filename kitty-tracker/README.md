@@ -55,12 +55,42 @@ deployed — they're saved here verbatim for backup.
 3. Save. **Deploy → Manage deployments → Edit → New version → Deploy** (keep the
    same `/exec` URL).
 
-## Using the Review queue (assigning payments)
-Venmo payments the parser couldn't match show up under **Needs Review**:
+## How Venmo payments get credited
+The parser reads the **note** on each Venmo receipt to decide who gets credited:
+- **Paying for yourself** — the note is empty/generic, so the payment is credited
+  to whoever the **sender** matches on the roster (handle or name).
+- **Paying for someone else** — the note clearly names **one** recruit (e.g.
+  "Jake's week 3"), so that recruit is credited and the actual sender is kept as
+  the **PayerName** ("paid by …"). The note wins over the sender here.
+- **Note names two+ recruits**, or no one clearly → held in **Needs Review** so
+  you can assign/split it by hand.
+
+On top of that, a receipt only **auto-credits** when the amount is a **clean
+whole-week multiple of $20** — $20, $40, $60 … up to the $300 season total. Odd
+amounts that don't divide evenly ($30, $50, $70) and anything over the season
+total are held in **Needs Review** so you can confirm/split them before they
+count. Payments the parser couldn't match to a recruit also land here.
+
+Venmo payments that need a human show up under **Needs Review**:
 - **Assign** — pick the recruit in the dropdown, click **Assign**. Credits them, clears the review.
 - **Split** — one payment that covered several recruits: click **Split**, **+ Add recruit** for each, enter amounts (and optional weeks like `1,2`); the **Remaining** must read `$0.00 ✓ balanced`, then **Save split**.
 - **Dismiss** — removes a row that isn't a dues payment.
 - Person missing from the dropdown? Add them to the **Roster** tab (or via the sign-up Form) and refresh.
+
+## Re-running Venmo under new rules
+Changed the crediting rules and want them applied to recent payments? In the
+Apps Script editor run **`reprocessRecentVenmo`** (function dropdown → Run).
+It:
+- **Backs up the whole Ledger first** to a timestamped `Ledger_bak_…` tab (so
+  it's fully reversible — delete the Ledger and rename the backup back).
+- Re-reads the last **14 days** of Venmo receipts and rebuilds those rows under
+  the current rules (note-wins matching + whole-week auto-credit).
+- **Leaves all cash and manually-entered rows alone** — only email-derived Venmo
+  rows in the window are redone.
+
+Pass a different window in days, e.g. `reprocessRecentVenmo(30)`. A receipt you'd
+previously hand-split or dismissed will be re-evaluated from scratch (the old
+version is preserved in the backup tab).
 
 ## Setup notes (for reference)
 - Run `setupKitty()` once to create/upgrade tabs (Roster, Ledger, Expenses) and

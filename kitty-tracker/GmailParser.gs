@@ -26,7 +26,7 @@ function parseVenmoInbox(){
       if (!parsed) return;                                     // not a payment-received email
 
       const match = matchRecruit_(parsed, roster);
-      const amountOk = parsed.amount > 0 && parsed.amount <= MAX_PREPAY;
+      const amountOk = isWholeWeeks_(parsed.amount);
       const confident = match && amountOk;
 
       appendPayment_(
@@ -145,9 +145,34 @@ function previewVenmoMemos(){
   return txt;
 }
 
-/* Match a parsed payment to a recruit. Handle first, then exact normalized
+/* True when an amount is a clean whole-week prepay we can auto-credit: a positive
+ * whole-number multiple of one week's dues ($20, $40, $60 …) that doesn't exceed
+ * the full season total. Anything else — odd amounts ($30, $50, $70) or more than
+ * the season total — returns false so the payment lands in the review queue. */
+function isWholeWeeks_(amount){
+  if (!(amount > 0) || amount > TOTAL_PER_RECRUIT) return false;
+  const weeks = amount / WEEKLY_DUES;
+  return Math.abs(weeks - Math.round(weeks)) < 0.005;   // clean multiple of WEEKLY_DUES
+}
+
+/* Match a parsed payment to a recruit.
+ * The Venmo NOTE wins: when someone pays for someone else, the recipient's name
+ * is in the note, not the sender. So we read the note first —
+ *   • note clearly names exactly ONE recruit → credit that recruit
+ *   • note names TWO+ recruits → no auto-match (let the review/split flow handle it)
+ *   • note names no one clearly → fall through to sender matching below.
+ * Sender matching (the "paying for self" path): handle, then exact normalized
  * name, then last-name + first-initial. Anything looser -> no match (review). */
 function matchRecruit_(parsed, roster){
+  // 0) Note wins. memoMentionsRecruits_ already enforces strict rules (full name,
+  //    or a roster-unique first/last token ≥4 chars), so a single hit is safe to
+  //    credit; multiple hits mean it's a split → send to review.
+  if (parsed.memo){
+    const mentioned = memoMentionsRecruits_(parsed.memo, roster);
+    if (mentioned.length === 1) return recruitById_(mentioned[0].rid) || mentioned[0];
+    if (mentioned.length > 1) return null;                       // names 2+ recruits → review/split
+  }
+
   if (parsed.handle){
     const byH = roster.filter(r => r.venmo && r.venmo === parsed.handle)[0];
     if (byH) return byH;
@@ -239,7 +264,7 @@ function backfillFromEmails(){
       } else if (!processed){
         // Truly missed (thread never processed) → record once, parser's own rules.
         const match = matchRecruit_(parsed, roster);
-        const amountOk = parsed.amount > 0 && parsed.amount <= MAX_PREPAY;
+        const amountOk = isWholeWeeks_(parsed.amount);
         const confident = match && amountOk;
         appendPayment_(
           confident ? match.rid : '',
@@ -259,4 +284,83 @@ function backfillFromEmails(){
 
   return 'Email rerun: scanned ' + scanned + ' receipts · filled PayerName on ' + filled +
          ' rows · added ' + added + ' previously-missed payment' + (added === 1 ? '' : 's') + '.';
+}
+
+/* ── Reprocess recent Venmo under the CURRENT rules ──────────────────────────── *
+ * One-shot maintenance: re-read the last N days of Venmo receipts and REBUILD
+ * their ledger rows from scratch using today's crediting logic (note-wins
+ * matching in matchRecruit_ + whole-week auto-credit in isWholeWeeks_). Use this
+ * after changing the rules so older receipts get re-credited the new way.
+ *
+ * What it touches:
+ *   • ONLY rows whose Source is the Gmail message-ID of a receipt in the window.
+ *     Cash rows, dashboard/manual entries, and Venmo older than the window are
+ *     left completely alone (their Source is 'Cash'/'Dashboard'/an older ID).
+ *   • A receipt that had been hand-split into several rows collapses back to one
+ *     row and is re-evaluated — the pre-existing split is preserved in the backup.
+ *
+ * Safety: snapshots the ENTIRE Ledger to a timestamped backup tab FIRST, so the
+ * whole thing is reversible (delete Ledger, rename the backup back to "Ledger").
+ * Deletes the old rows, THEN re-appends, so cumulative week math stays correct.
+ *
+ * Run from the editor: function dropdown → reprocessRecentVenmo (defaults to 14
+ * days). Pass a number to change the window, e.g. reprocessRecentVenmo(30). */
+function reprocessRecentVenmo(days){
+  days = (days && days > 0) ? Math.floor(days) : 14;
+  ensureSchema_();
+
+  // 1) Back up the whole Ledger so this is fully reversible.
+  const ss  = ss_();
+  const led = sheet_(LEDGER_TAB);
+  const backupName = 'Ledger_bak_' + Utilities.formatDate(new Date(), TIMEZONE, 'yyyyMMdd-HHmmss');
+  led.copyTo(ss).setName(backupName);
+
+  // 2) Pull the Venmo receipts in the window and parse each one.
+  const query   = 'from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you") newer_than:' + days + 'd';
+  const threads = GmailApp.search(query, 0, 200);
+  const label   = getOrCreateLabel_(PROCESSED_LABEL);
+  const roster  = activeRoster_();
+
+  const windowIds = {};     // message-IDs of receipts in this window
+  const toIngest  = [];     // [{ id, parsed }]
+  threads.forEach(thread => {
+    thread.getMessages().forEach(msg => {
+      if (msg.getFrom().toLowerCase().indexOf('venmo') === -1) return;
+      const parsed = extractVenmo_(msg.getSubject(), msg.getPlainBody());
+      if (!parsed) return;
+      const id = msg.getId();
+      windowIds[id] = true;
+      toIngest.push({ id: id, parsed: parsed });
+    });
+    if (!thread.getLabels().some(l => l.getName() === PROCESSED_LABEL)) thread.addLabel(label);
+  });
+
+  // 3) Remove the existing email-derived rows for these receipts (bottom-up so
+  //    row numbers don't shift mid-delete). Everything else is untouched.
+  const rowsToDelete = getLedger_()
+    .filter(e => e.source && windowIds[e.source])
+    .map(e => e.row)
+    .sort((a, b) => b - a);
+  rowsToDelete.forEach(r => led.deleteRow(r));
+
+  // 4) Re-ingest each receipt under the current rules.
+  let credited = 0, review = 0;
+  toIngest.forEach(item => {
+    const parsed    = item.parsed;
+    const match     = matchRecruit_(parsed, roster);
+    const amountOk  = isWholeWeeks_(parsed.amount);
+    const confident = match && amountOk;
+    appendPayment_(
+      confident ? match.rid  : '',
+      confident ? match.name : '',
+      'Venmo', parsed.amount, item.id, !confident,
+      { payer: parsed.payer || 'Unknown', memo: parsed.memo }
+    );
+    if (confident) credited++; else review++;
+  });
+
+  return 'Reprocessed Venmo (last ' + days + ' days): backed up to tab "' + backupName + '" · ' +
+         'removed ' + rowsToDelete.length + ' old Venmo row' + (rowsToDelete.length === 1 ? '' : 's') + ' · ' +
+         're-added ' + toIngest.length + ' (' + credited + ' auto-credited, ' + review + ' to review). ' +
+         'Cash and manual entries untouched.';
 }

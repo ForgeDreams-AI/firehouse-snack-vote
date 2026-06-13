@@ -52,7 +52,9 @@ const REVIEW_BAD  = 'Payment Bad!';    // couldn't match — shows in the dashbo
 /* ── Gmail / parsing ─────────────────────────────────────────────────────── */
 const VENMO_SENDER    = 'venmo@venmo.com';
 const PROCESSED_LABEL = 'KittyProcessed';   // applied to Venmo emails we've recorded
-const MAX_PREPAY      = TOTAL_PER_RECRUIT;  // payments over this -> review queue
+// Venmo auto-credits ONLY when the amount is a clean whole-week multiple of
+// WEEKLY_DUES ($20, $40, $60 … up to the season total). Odd amounts ($30, $50,
+// $70) and anything over the season total -> review queue. See isWholeWeeks_().
 
 /* ── Receipts / reporting (Feature 3) ────────────────────────────────────── */
 const RECEIPT_FOLDER_NAME = 'PHX FD Kitty Receipts';   // Drive folder for uploaded receipt files
