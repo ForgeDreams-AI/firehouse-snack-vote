@@ -210,9 +210,12 @@ function appendPayment_(rid, name, method, amount, source, review, opts){
   const payer = (opts.payer != null && String(opts.payer).trim()) ? String(opts.payer).trim() : name;
   const split = opts.splitGroup ? String(opts.splitGroup) : '';
   const memo  = (opts.memo != null) ? String(opts.memo).trim() : '';
+  // opts.ts lets a historical import stamp the row with the real payment date;
+  // live ingestion omits it and gets "now".
+  const ts    = (opts.ts != null && String(opts.ts).trim()) ? String(opts.ts).trim() : nowStamp_();
 
   sheet_(LEDGER_TAB).appendRow([
-    nowStamp_(), rid, name, method, amount, weekApplied,
+    ts, rid, name, method, amount, weekApplied,
     payer, source, split, review ? REVIEW_BAD : REVIEW_GOOD, memo
   ]);
 }
