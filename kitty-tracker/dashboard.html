@@ -107,6 +107,18 @@
     </div>
   </div>
 
+  <!-- Who-owes report -->
+  <div class="ovl" id="owes">
+    <div class="card">
+      <h2 id="owTitle">Who Owes</h2>
+      <div id="owBody"><div class="spin">Loading…</div></div>
+      <div class="modActs" style="margin-top:12px">
+        <button class="go" onclick="copyOwes()">📋 Copy list</button>
+        <button onclick="closeOwes()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Split one unmatched Venmo across recruits -->
   <div class="ovl" id="split">
     <div class="card">
@@ -192,7 +204,8 @@ function render(d){
   h += '<div class="meter"><div class="meterfill" style="width:'+pct+'%"></div></div>';
   h += '<div style="text-align:right;font-size:11px;color:var(--mut);margin:4px 0 8px">'+pct+'% collected</div>';
   h += '<div class="acts"><button class="go" onclick="openModal()">+ Log Payment</button>'
-    +  '<button onclick="openReceipt()">📁 Add Receipt</button></div>';
+    +  '<button onclick="openReceipt()">📁 Add Receipt</button>'
+    +  '<button onclick="openOwes()">📋 Who Owes</button></div>';
 
   // Possible Splits — already-credited payments whose memo names other recruits.
   if(d.splitSuggestions && d.splitSuggestions.length){
@@ -255,6 +268,65 @@ function render(d){
 function togglePause(){
   google.script.run.withSuccessHandler(r => { toast(r.paused?'Reminders paused':'Reminders resumed'); load(); })
                    .withFailureHandler(e => toast('Error: '+e)).togglePauseWeb();
+}
+
+/* ── Who-owes report ──────────────────────────────────────────────────────
+ * Pure client-side: builds from the data already on the page. "Owed" = the
+ * shortfall to be caught up THROUGH the current week (same math as the table). */
+function owesList(){
+  const wk = DATA.week, due = DATA.weeklyDues;
+  return (DATA.rows||[])
+    .map(r => ({ name:r.name,
+                 owed:Math.max(0, wk*due - r.paid),
+                 behind:Math.max(0, wk - Math.floor(r.paid/due)) }))
+    .filter(o => o.owed > 0)
+    .sort((a,b) => b.owed - a.owed || a.name.localeCompare(b.name));
+}
+function openOwes(){
+  if(!DATA) return;
+  const list = owesList();
+  const total = list.reduce((s,o)=>s+o.owed,0);
+  document.getElementById('owTitle').textContent = 'Who Owes · Week '+DATA.week+'/'+DATA.seasonWeeks;
+  let h = '';
+  if(!list.length){
+    h = '<p style="color:var(--good);font-size:14px;font-weight:700">🎉 Everyone is caught up through week '+DATA.week+'!</p>';
+  } else {
+    h += '<p class="sub" style="margin-bottom:8px;font-size:13px"><b style="color:var(--cream)">'+list.length+'</b> recruit'+(list.length===1?'':'s')+' owe <b class="no">'+money(total)+'</b> through week '+DATA.week+'.</p>';
+    h += '<table class="rtable"><thead><tr><th>Name</th><th>Behind</th><th style="text-align:right">Owed</th></tr></thead><tbody>';
+    list.forEach(o => {
+      h += '<tr><td>'+esc(o.name)+'</td><td class="sub">'+o.behind+' wk'+(o.behind===1?'':'s')+'</td>'
+        +  '<td class="no" style="text-align:right">'+money(o.owed)+'</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  document.getElementById('owBody').innerHTML = h;
+  show('owes');
+}
+function closeOwes(){ hide('owes'); }
+function owesText(){
+  const list = owesList();
+  const total = list.reduce((s,o)=>s+o.owed,0);
+  const t0 = new Date(), ds = (t0.getMonth()+1)+'/'+t0.getDate();
+  let t = 'PHX FD Kitty — amounts owed through Week '+DATA.week+' ('+ds+')\n\n';
+  if(!list.length) return t + 'Everyone is caught up! 🎉';
+  list.forEach(o => { t += '• '+o.name+' — '+money(o.owed)+' ('+o.behind+' wk'+(o.behind===1?'':'s')+' behind)\n'; });
+  t += '\nTotal outstanding: '+money(total)+' across '+list.length+' '+(list.length===1?'person':'people')+'.';
+  return t;
+}
+function copyOwes(){
+  const t = owesText();
+  const done = ()=>toast('Copied — paste it anywhere.');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(()=>fallbackCopy(t,done));
+  } else { fallbackCopy(t,done); }
+}
+function fallbackCopy(t,done){
+  const ta=document.createElement('textarea'); ta.value=t;
+  ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{ document.execCommand('copy'); done(); }
+  catch(e){ toast('Copy failed — select the text manually.'); }
+  document.body.removeChild(ta);
 }
 
 /* ── Log-payment modal ── */
