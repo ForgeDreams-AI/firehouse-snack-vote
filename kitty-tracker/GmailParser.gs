@@ -79,6 +79,7 @@ function extractVenmo_(subject, body){
   // headers, lines that are just a dollar amount, image alt text, and button text.
   const JUNK_PATTERNS = [
     /^(transfer|payment id|transaction|amount|date|note from|view|help|venmo|see transaction|money credited|view in app|reply|forward|©|unsubscribe|open in app|hi |hello |dear )/i,
+    /paid you/i,                                                 // the "<Sender> paid you $X" headline — Venmo repeats it as a line; never the note
     /^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i,                  // bare amount line
     /^\[?\s*image\b/i,                                            // "image …", "[image: …]"
     /\b(logo|icon|avatar|button|profile photo|profile picture)\s*\]?\s*$/i,  // ends with logo/icon/etc
@@ -116,6 +117,7 @@ function looksBogusMemo_(s){
   s = String(s || '').trim();
   if (!s) return false;                                          // empty is fine
   if (/^\$?\s*[\d,]+(\.\d{1,2})?\s*(usd)?\s*$/i.test(s)) return true;     // pure amount
+  if (/paid you/i.test(s)) return true;                                    // "<Sender> paid you" headline grabbed by mistake
   if (/^\[?\s*image\b/i.test(s)) return true;                              // image alt
   if (/\b(logo|icon|avatar|button)\s*\]?\s*$/i.test(s)) return true;       // ends in logo etc
   if (/^\[\s*[a-z\s:]+\s*\]\s*$/i.test(s)) return true;                    // pure bracketed
