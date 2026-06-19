@@ -1,0 +1,186 @@
+Timestamp,RecruitID,FullName,Method,Amount,WeekApplied,PayerName,Source,SplitGroupID,Payment Status,Memo
+2026-06-03 04:37:01,,,Venmo,20,,Logan Abele,4611162632783592276,,Payment Bad!,Test
+2026-06-03 11:04:28,R027,Dylan Yeager,Venmo,20,1,Dylan Yeager,4611357640479728964,,Payment Good!,Kitty
+2026-06-03 21:24:43,R010,Ryan Johnson,Venmo,20,1,Ryan Johnson,4611669825849057892,,Payment Good!,Ryan Johnson
+2026-06-03 22:01:51,R014,Ethan Buckhardt,Venmo,20,1,Ethan Buckhardt,4611688517956811193,,Payment Good!,Ethan Buckhardt
+2026-06-03 22:06:02,R004,Damon Nguyen,Venmo,300,Prepay,damon nguyen,4611690621794557933,,Payment Good!,kitty
+2026-06-03 22:18:27,R015,Devyn O’Brien,Venmo,20,1,devyn obrien,4611696871911961183,,Payment Good!,Devyn O’Brien 🚒
+2026-06-04 02:17:03,,,Venmo,40,,Kendrick Pulce,4611816961638246243,,Payment Bad!,Kendrick Pulce & Anthony Abruzzini 🐱🐱🐱🐱🐱
+2026-06-04 03:18:16,R002,Jacob Fretto,Venmo,20,1,Jake Fretto,4611847776493541900,,Payment Good!,Jacob Fretto
+2026-06-04 7:17:20,R023,Justin sanchez,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-04 10:15:23,R030,Humberto Rodriguez,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-04 13:01:24,R020,Anthony Abruzzini,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-04 13:34:01,R005,Rayce nichols,Venmo,100,Prepay,Rayce Nichols,4612157690956967101,,Payment Good!,Kitty
+2026-06-04 14:21:36,R008,Isen Buntz,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-04 14:21:43,R016,Parker Owens,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-04 14:21:46,R016,Parker Owens,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-04 14:55:54,R018,Megan Hedlund,Venmo,300,Prepay,Megan Hedlund,4612198906411468380,,Payment Good!,Megan Hedlund 26.2
+2026-06-04 17:08:45,R017,Caswell Curry,Venmo,20,1,CJ CJ Curry,4612265771678854010,,Payment Good!,Kitty
+2026-06-04 17:13:20,R006,Conner Kitterman,Venmo,20,1,Conner Kitterman,4612268074318063114,,Payment Good!,Conner Kitterman kitty payment
+2026-06-04 17:14:17,R013,Tyler Maguire,Venmo,20,1,Tyler Maguire,4612268553945161818,,Payment Good!,🐈
+2026-06-04 17:14:50,R009,Jakob Hernandez,Venmo,20,1,Jakob Hernandez,4612268833478642849,,Payment Good!,Kitty
+2026-06-04 17:15:34,R024,Nicholas Tamborrino,Venmo,20,1,Nicholas Tamborrino,4612269200707012261,,Payment Good!,Kitty
+2026-06-04 19:11:55,R032,Jacob Mulligan,Venmo,20,1,Jacob Mulligan,4612327763953123402,,Payment Good!,Jacob Mulligan
+2026-06-05 00:06:42,R033,Ryan Giordano,Venmo,20,1,Ryan Giordano,4612476126686296310,,Payment Good!,Ryan Giordano
+2026-06-05 5:03:24,R031,Alexander Terrian,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 5:13:02,R037,Parker Munier,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 5:21:36,R036,Joshua salvatierra,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 5:21:38,R036,Joshua salvatierra,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 5:21:39,R036,Joshua salvatierra,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 5:29:39,R022,Lawrence Nunez,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 7:32:42,R012,William Kent Wickware II,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 7:32:45,R028,Ricardo Garcia,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 7:34:47,R048,Bailey Busby,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 7:35:12,R021,Vincent Leto,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 7:35:12,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:12,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:13,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:13,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:14,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:14,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:15,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:15,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:16,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:17,R021,Vincent Leto,Cash,20,Prepay,,Dashboard,,Payment Good!,
+2026-06-05 7:35:34,R046,Kyle Davis,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 7:47:19,R049,Carson reilly,Cash,20,1,,Dashboard,,Payment Good!,
+2026-06-05 11:30:37,R025,Ryan flores,Venmo,20,1,Ryan Flores,4612820353601548290,,Payment Good!,Ryan Flores 🐱🐱
+2026-06-05 12:10:31,R044,Caleb Smyers,Venmo,20,1,Caleb Smyers,4612840435416818364,,Payment Good!,Kitty🍕
+2026-06-05 12:10:38,R029,Dylan urquilla,Venmo,20,1,Dylan Urquilla,4612840494900314418,,Payment Good!,Dylan Urquilla
+2026-06-05 12:10:42,R043,Anthony Weidner,Venmo,300,Prepay,Anthony Weidner,4612840529696798717,,Payment Good!,Kitty
+2026-06-05 12:14:21,R003,Branson Mitchell,Venmo,20,1,Branson Mitchell,4612842369913609968,,Payment Good!,Kitty
+2026-06-05 12:14:49,R041,Jack Shreiber,Venmo,20,1,Jack Shreiber,4612842602521306205,,Payment Good!,chow
+2026-06-05 12:19:01,R035,Frederick Miller,Venmo,20,1,Fred Miller,04L26857Y30961420,,Payment Good!,🍕
+2026-06-05 12:19:10,R026,Landon Gillespie,Venmo,20,1,Landon Gillespie,4612844792711652445,,Payment Good!,:venmo_dollar:
+2026-06-05 12:19:36,R039,Christopher phillips,Venmo,300,Prepay,Christopher Phillips,4612845013256243579,,Payment Good!,Kitty
+2026-06-05 12:38:22,R034,Jeff Ohm,Venmo,20,1,Jeff Ohm,4612854458929993298,,Payment Good!,JEFF OHM KITTY
+2026-06-05 14:25:42,R038,Djevon Miles,Venmo,20,1,Dj Miles,4612908474787953955,,Payment Good!,Dj miles
+2026-06-05 14:26:25,R040,Micah Barnett,Venmo,20,1,Micah Barnett,4612908839004125756,,Payment Good!,Week 0 kitty
+2026-06-05 14:28:17,R026,Landon Gillespie,Venmo,20,2,Landon Gillespie,4612909778192670527,,Payment Good!,:venmo_dollar:
+2026-06-05 14:28:27,R047,Pat brannan,Venmo,300,Prepay,Pat Brannan,4612909864058835520,,Payment Good!,Kitty
+2026-06-05 14:29:34,,,Venmo,60,,Kendrick Pulce,4612910428117070976,,Payment Bad!,"Kyle Davis, Colton Mendez, Ivan Hernandez meow"
+2026-06-05 15:08:27,,,Venmo,10,,Joshua Salvatierra,4612929994502701157,,Payment Bad!,50 cash 10 Venmo=$60 total
+2026-06-05 15:12:47,,,Venmo,20,,Lawrence Nunez,4612932178401852179,,Payment Bad!,Carson Reilly Kitty
+2026-06-05 18:03:56,R019,Jade Valdez,Venmo,20,1,Jade Valdez,4613018318534398571,,Payment Good!,Kitty
+2026-06-05 19:00:25,R053,DJ Olmstead,Venmo,20,1,DJ Olmstead,4613046751771744745,,Payment Good!,DJ Olmstead
+2026-06-05 19:04:07,R052,William (Garrett) Sayle,Venmo,20,1,William Sayle,4613048611987050867,,Payment Good!,William Sayle
+2026-06-09 18:21:26,R021,Vincent Leto,Cash,20,12,Vincent Leto,Dashboard,,Payment Good!,
+2026-06-09 18:21:27,R021,Vincent Leto,Cash,20,13,Vincent Leto,Dashboard,,Payment Good!,
+2026-06-09 18:21:27,R021,Vincent Leto,Cash,20,14,Vincent Leto,Dashboard,,Payment Good!,
+2026-06-09 18:21:27,R021,Vincent Leto,Cash,20,15,Vincent Leto,Dashboard,,Payment Good!,
+2026-06-09 18:56:48,R007,Adrian Centeno Ojeda,Cash,20,1,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:48,R007,Adrian Centeno Ojeda,Cash,20,2,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:48,R007,Adrian Centeno Ojeda,Cash,20,3,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:49,R007,Adrian Centeno Ojeda,Cash,20,4,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:50,R007,Adrian Centeno Ojeda,Cash,20,5,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:50,R007,Adrian Centeno Ojeda,Cash,20,6,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:50,R007,Adrian Centeno Ojeda,Cash,20,7,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:51,R007,Adrian Centeno Ojeda,Cash,20,8,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:51,R007,Adrian Centeno Ojeda,Cash,20,9,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:52,R007,Adrian Centeno Ojeda,Cash,20,10,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:53,R007,Adrian Centeno Ojeda,Cash,20,11,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:54,R007,Adrian Centeno Ojeda,Cash,20,12,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:54,R007,Adrian Centeno Ojeda,Cash,20,13,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:54,R007,Adrian Centeno Ojeda,Cash,20,14,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 18:56:55,R007,Adrian Centeno Ojeda,Cash,20,15,Adrian Centeno Ojeda,Dashboard,,Payment Good!,
+2026-06-09 19:15:38,R051,Andrew  Dickerson,Cash,20,1,Andrew  Dickerson,Dashboard,,Payment Good!,
+2026-06-10 00:26:45,R002,Jacob Fretto,Venmo,20,2,Jake Fretto,4616110101115818956,,Payment Good!,Jacob Fretto
+2026-06-10 00:28:41,R010,Ryan Johnson,Venmo,20,2,Ryan Johnson,4616111073028702021,,Payment Good!,Ryan Johnson
+2026-06-10 11:13:33,R041,Jack Shreiber,Venmo,20,2,Jack Shreiber,4616435646290530894,,Payment Good!,kitty
+2026-06-10 11:15:52,R011,Kendrick Pulce,Venmo,20,1,Kendrick Pulce,4616436812390986484,,Payment Good!,Kendrick 🐱
+2026-06-10 14:04:33,R006,Conner Kitterman,Venmo,20,2,Conner Kitterman,59E59339SL4826500,,Payment Good!,Kitty
+2026-06-10 14:11:25,R014,Ethan Buckhardt,Venmo,20,2,Ethan Buckhardt,4616525169674355631,,Payment Good!,Ethan Buckhardt
+2026-06-11 00:35:18,R052,William (Garrett) Sayle,Venmo,20,2,William Sayle,4616839178079993723,,Payment Good!,Kitty
+2026-06-11 4:33:11,R037,Parker Munier,Cash,20,2,Parker Munier,Dashboard,,Payment Good!,
+2026-06-11 21:38:39,R027,Dylan Yeager,Venmo,20,2,Dylan Yeager,4617475041873004171,,Payment Good!,🚒🐈
+2026-06-11 22:08:40,R009,Jakob Hernandez,Venmo,20,2,Jakob Hernandez,4617490149512633955,,Payment Good!,Kitty
+2026-06-11 22:38:06,R053,DJ Olmstead,Venmo,20,2,DJ Olmstead,4617504962260082142,,Payment Good!,DJ Olmstead
+2026-06-11 22:54:53,R025,Ryan flores,Venmo,20,2,Ryan Flores,9AS98842TS425535B,,Payment Good!,Kittyyyy
+2026-06-12 00:03:36,R033,Ryan Giordano,Venmo,20,2,Ryan Giordano,4617547998083242145,,Payment Good!,Kitty
+2026-06-12 00:48:39,R003,Branson Mitchell,Venmo,20,2,Branson Mitchell,4617570673422134976,,Payment Good!,For that kitty kitty
+2026-06-12 00:48:44,R024,Nicholas Tamborrino,Venmo,20,2,Nicholas Tamborrino,4617570715641787100,,Payment Good!,Kitty
+2026-06-12 00:49:12,R032,Jacob Mulligan,Venmo,20,2,Jacob Mulligan,4617570949466184701,,Payment Good!,Kitty
+2026-06-12 00:49:25,R017,Caswell Curry,Venmo,20,2,CJ CJ Curry,4617571056865466719,,Payment Good!,Kitty
+2026-06-12 00:49:56,,,Venmo,40,,Lawrence Nunez,4617571315889341468,,Payment Bad!,Kitty🐈 myself and Carson
+2026-06-12 00:51:20,R026,Landon Gillespie,Venmo,20,3,Landon Gillespie,4617572021706600909,,Payment Good!,:venmo_dollar:
+2026-06-12 00:59:15,R055,Mason Jones,Venmo,20,1,Mason Jones,4617576006311731414,,Payment Good!,Kitty
+2026-06-12 01:15:22,,,Venmo,20,,Kendrick Pulce,4617584121065749337,,Payment Bad!,Anthony Abruzzini 🐱
+2026-06-12 4:20:29,R045,Alex Mendez,Cash,20,1,Alex Mendez,Dashboard,,Payment Good!,
+2026-06-12 4:20:30,R045,Alex Mendez,Cash,20,2,Alex Mendez,Dashboard,,Payment Good!,
+2026-06-12 11:37:18,R040,Micah Barnett,Venmo,20,2,Micah Barnett,4617897150981972818,,Payment Good!,6/12/26
+2026-06-12 18:37:08,R044,Caleb Smyers,Venmo,20,2,Caleb Smyers,4618108455806349862,,Payment Good!,Caleb Smyers Kitty
+2026-06-12 18:49:39,R029,Dylan urquilla,Venmo,20,2,Dylan Urquilla,4618114758704966085,,Payment Good!,Kitty
+2026-06-12 20:23:57,,,Venmo,20,,Jacob Mulligan,4618162217909274069,,Payment Bad!,Isen Buntz kitty
+2026-06-12 20:36:09,,,Venmo,20,,Nicholas Tamborrino,4618168360374608888,,Payment Bad!,Humberto R’s kitty 💵
+2026-06-12 20:38:52,,,Venmo,40,,Kendrick Pulce,4618169733162239984,,Payment Bad!,"Kyle Davis, Ivan Hernandez 🐱"
+2026-06-12 20:46:19,R013,Tyler Maguire,Venmo,20,2,Tyler Maguire,4618173474808115908,,Payment Good!,🐱
+2026-06-12 20:54:47,R019,Jade Valdez,Venmo,20,2,Jade Valdez,4618177737329123378,,Payment Good!,Kitty
+2026-06-12 21:28:12,R034,Jeff Ohm,Venmo,20,2,Jeff Ohm,51W410692A2201747,,Payment Good!,Kitty
+2026-06-12 21:44:49,R015,Devyn O’Brien,Venmo,20,2,devyn obrien,4618202924577109139,,Payment Good!,🚒
+2026-06-12 22:15:32,,,Venmo,20,,Landon Gillespie,4618218381417888800,,Payment Bad!,this is for rico
+2026-06-12 22:30:40,,,Venmo,20,,Landon Gillespie,4618225997048994747,,Payment Bad!,this is for will
+2026-06-13 16:01:48,R035,Frederick Miller,Venmo,20,2,Fred Miller,4618755054828993203,,Payment Good!,🍕
+2026-06-14 17:02:31,R038,Djevon Miles,Venmo,20,2,Dj Miles,4619510385812868144,,Payment Good!,Kitty
+2026-06-16 13:29:57,R042,Curtis Johnson,Cash,20,1,Curtis Johnson,Dashboard,,Payment Good!,
+2026-06-16 13:29:57,R042,Curtis Johnson,Cash,20,2,Curtis Johnson,Dashboard,,Payment Good!,
+2026-06-16 13:29:58,R042,Curtis Johnson,Cash,20,3,Curtis Johnson,Dashboard,,Payment Good!,
+2026-06-16 13:37:36,R001,Anthony Hidalgo,Cash,20,2,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:37,R001,Anthony Hidalgo,Cash,20,3,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:38,R001,Anthony Hidalgo,Cash,20,4,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:38,R001,Anthony Hidalgo,Cash,20,5,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:38,R001,Anthony Hidalgo,Cash,20,6,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:39,R001,Anthony Hidalgo,Cash,20,7,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:39,R001,Anthony Hidalgo,Cash,20,8,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:40,R001,Anthony Hidalgo,Cash,20,9,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:41,R001,Anthony Hidalgo,Cash,20,10,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:41,R001,Anthony Hidalgo,Cash,20,11,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:42,R001,Anthony Hidalgo,Cash,20,12,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:43,R001,Anthony Hidalgo,Cash,20,13,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:43,R001,Anthony Hidalgo,Cash,20,14,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:37:44,R001,Anthony Hidalgo,Cash,20,15,Anthony Hidalgo,Dashboard,,Payment Good!,
+2026-06-16 13:38:17,R025,Ryan flores,Cash,20,3,Ryan flores,Dashboard,,Payment Good!,
+2026-06-16 16:00:49,R055,Mason Jones,Cash,20,2,Mason Jones,Dashboard,,Payment Good!,
+2026-06-17 00:42:40,R010,Ryan Johnson,Venmo,20,3,Ryan Johnson,25M55040T9995981X,,Payment Good!,Ryan Johnson
+2026-06-17 11:32:49,R014,Ethan Buckhardt,Venmo,20,3,Ethan Buckhardt,4621518769118540104,,Payment Good!,Ethan Buckhardt
+2026-06-17 15:11:15,R048,Bailey Busby,Cash,20,2,Bailey Busby,Dashboard,,Payment Good!,
+2026-06-17 15:11:49,R023,Justin sanchez,Cash,20,2,Justin sanchez,Dashboard,,Payment Good!,
+2026-06-17 20:11:52,R002,Jacob Fretto,Venmo,20,3,Jake Fretto,4621780022046922110,,Payment Good!,Jacob Fretto
+2026-06-17 20:36:16,R026,Landon Gillespie,Venmo,20,Prepay,Landon Gillespie,4621792302851036331,,Payment Good!,:venmo_dollar:
+2026-06-17 23:13:27,R052,William (Garrett) Sayle,Venmo,20,3,William Sayle,4621871416509948004,,Payment Good!,Kitty
+2026-06-17 23:16:24,R023,Justin sanchez,Venmo,20,3,Justin Sanchez,4621872898181386797,,Payment Good!,Kitty (Justin Sanchez)
+2026-06-18 00:20:59,R044,Caleb Smyers,Venmo,20,3,Caleb Smyers,4621905403415912779,,Payment Good!,Caleb Smyers kitty
+2026-06-18 00:58:16,,,Venmo,40,,Kendrick Pulce,4621924168925922523,,Payment Bad!,Colton Mendez 🐱
+2026-06-18 4:59:27,R016,Parker Owens,Cash,20,3,Parker Owens,Dashboard,,Payment Good!,
+2026-06-18 09:47:35,R019,Jade Valdez,Venmo,20,3,Jade Valdez,4622190581325540051,,Payment Good!,Kitty
+2026-06-18 09:52:34,R041,Jack Shreiber,Venmo,20,3,Jack Shreiber,4622193090962996377,,Payment Good!,grub
+2026-06-18 10:06:04,R017,Caswell Curry,Venmo,20,3,CJ CJ Curry,4622199882790745047,,Payment Good!,Kitty
+2026-06-18 12:16:04,R031,Alexander Terrian,Cash,20,2,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:05,R031,Alexander Terrian,Cash,20,3,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:07,R031,Alexander Terrian,Cash,20,4,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:08,R031,Alexander Terrian,Cash,20,5,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:09,R031,Alexander Terrian,Cash,20,6,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:09,R031,Alexander Terrian,Cash,20,7,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:10,R031,Alexander Terrian,Cash,20,8,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:12,R031,Alexander Terrian,Cash,20,9,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:13,R031,Alexander Terrian,Cash,20,10,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:13,R031,Alexander Terrian,Cash,20,11,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:14,R031,Alexander Terrian,Cash,20,12,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:15,R031,Alexander Terrian,Cash,20,13,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:16,R031,Alexander Terrian,Cash,20,14,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 12:16:17,R031,Alexander Terrian,Cash,20,15,Alexander Terrian,Dashboard,,Payment Good!,
+2026-06-18 13:56:58,R006,Conner Kitterman,Venmo,20,3,Conner Kitterman,7KG23145LS720550M,,Payment Good!,Kitty
+2026-06-18 19:15:59,R055,Mason Jones,Venmo,20,3,Mason Jones,4622476668116380745,,Payment Good!,Kitty
+2026-06-18 19:17:56,R032,Jacob Mulligan,Venmo,20,3,Jacob Mulligan,4622477650271321356,,Payment Good!,🐈
+2026-06-18 19:20:24,R035,Frederick Miller,Venmo,20,3,Fred Miller,4622478888094064658,,Payment Good!,🍕
+2026-06-18 19:20:37,R053,DJ Olmstead,Venmo,20,3,DJ Olmstead,4622479000275019668,,Payment Good!,DJ Olmstead
+2026-06-18 20:35:39,R029,Dylan urquilla,Venmo,20,3,Dylan Urquilla,4622516768934285585,,Payment Good!,Kitty
+2026-06-18 21:06:00,R033,Ryan Giordano,Venmo,20,3,Ryan Giordano,4622532040419927873,,Payment Good!,Kitty
+2026-06-18 21:20:28,R003,Branson Mitchell,Venmo,20,3,Branson Mitchell,4622539325674540153,,Payment Good!,😺
+2026-06-18 22:16:37,,,Venmo,40,,devyn obrien,4622567585854852259,,Payment Bad!,Kitty devyn and Bailey
+2026-06-18 22:26:20,R030,Humberto Rodriguez,Venmo,20,2,Humberto Rodriguez,95U05200S17268034,,Payment Good!,Kitty
+2026-06-18 22:33:55,,,Venmo,40,,Lawrence Nunez,4622576286552131442,,Payment Bad!,Kitty for me and Carson 🐈
+2026-06-19 02:09:10,R045,Alex Mendez,Venmo,20,3,Alex Mendez,4622684632739476100,,Payment Good!,Alex Mendez: Kitty money
+2026-06-19 03:11:15,R013,Tyler Maguire,Venmo,20,3,Tyler Maguire,4622715876748017804,,Payment Good!,🐱
+2026-06-19 03:56:57,R009,Jakob Hernandez,Venmo,20,3,Jakob Hernandez,4622738879829295687,,Payment Good!,Kitty
+2026-06-19 14:39:09,R024,Nicholas Tamborrino,Venmo,20,3,Nicholas Tamborrino,4623062110209494672,,Payment Good!,Kitty
+2026-06-19 15:45:01,R040,Micah Barnett,Venmo,20,3,Micah Barnett,4623095257391340427,,Payment Good!,Kitty
