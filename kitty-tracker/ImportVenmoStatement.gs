@@ -16,6 +16,19 @@
  *  Run from the editor: function dropdown → importVenmoStatement → Run.
  *  Delete this file once the month is loaded and you've switched the poller on. */
 
+/* SAFETY: after pasting a corrected Ledger by hand (rows keyed by Venmo
+ * transaction ID), the 15-min poller would re-add those same payments from
+ * Gmail (it keys by message-ID, so it can't tell they're already in). Run this
+ * ONCE to label every Venmo "paid you" receipt through the statement cutoff as
+ * processed, so the poller skips them and only ingests NEW payments after.
+ * Adjust the before: date if your statement ends later. */
+function markVenmoProcessedThroughCutoff(){
+  const label = getOrCreateLabel_(PROCESSED_LABEL);
+  const threads = GmailApp.search('from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you") before:2026/06/20', 0, 300);
+  threads.forEach(t => t.addLabel(label));
+  return 'Labeled ' + threads.length + ' Venmo threads processed (through 6/19). The poller will now skip these and only pick up payments dated 6/20 onward.';
+}
+
 // Per-transaction overrides for lines the rules can't read from the note alone.
 //   creditTo → force-credit this recruit (looked up against the roster)
 //   review   → force into the review queue for manual assignment
