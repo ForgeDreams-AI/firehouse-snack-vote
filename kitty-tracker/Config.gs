@@ -4,6 +4,10 @@
  */
 const SENDER_GMAIL    = 'ant2242955@maricopa.edu';                          // academy send-from Gmail (also the Venmo-to handle owner)
 const VENMO_HANDLE    = '@TonyJo77';                                        // Venmo @handle recruits send dues to (shown in reminder emails)
+// The person who OWNS the Venmo account (the recipient of every payment).
+// Their name appears somewhere in every receipt email, so the parser must
+// never auto-credit them from a note — see matchRecruit_ / extractVenmo_.
+const COLLECTOR_NAME  = 'Anthony Hidalgo';
 const VOTING_SITE_URL = 'https://forgedreams-ai.github.io/firehouse-snack-vote/';  // snack-vote link dropped into the email footer
 
 /* ── Locked spec — UNCHANGED from v1 (do not change) ─────────────────────── */
