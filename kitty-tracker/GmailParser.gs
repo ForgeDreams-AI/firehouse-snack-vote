@@ -86,6 +86,11 @@ function extractVenmo_(subject, body){
     /^\[\s*[a-z\s:]+\s*\]\s*$/i,                                  // pure bracketed alt text "[anything]"
   ];
   const isJunk = s => JUNK_PATTERNS.some(re => re.test(s));
+  // The collector (payment recipient) appears in every receipt email — a line
+  // that's just their name is layout noise, never the note. Skipping it is what
+  // keeps a bad parse from mass-crediting the collector.
+  const normName = s => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+  const isCollectorLine = s => normName(s) === normName(COLLECTOR_NAME);
   let memo = '';
   const lines = body.split(/\r?\n/).map(l => l.trim());
   for (let i = 0; i < lines.length - 1; i++){
@@ -94,9 +99,11 @@ function extractVenmo_(subject, body){
         let cand = lines[j];
         if (!cand) continue;
         if (isJunk(cand)) continue;
+        if (isCollectorLine(cand)) continue;                      // recipient-name line, not the note
         cand = cand.replace(/^["“”'`]+|["“”'`]+$/g, '').trim();
         if (cand.length < 2 || cand.length > 280) continue;
         if (isJunk(cand)) continue;                               // re-check post-strip
+        if (isCollectorLine(cand)) continue;
         memo = cand; break;
       }
       if (memo) break;
@@ -170,7 +177,13 @@ function matchRecruit_(parsed, roster){
   //    or a roster-unique first/last token ≥4 chars), so a single hit is safe to
   //    credit; multiple hits mean it's a split → send to review.
   if (parsed.memo){
-    const mentioned = memoMentionsRecruits_(parsed.memo, roster);
+    // HARD RULE: the collector (Venmo recipient) can never be credited from a
+    // note. Their name is in every receipt email, so a mention is layout noise,
+    // not "paying for the collector" — dropping it here is the backstop that
+    // makes the mass-mis-credit failure structurally impossible.
+    const norm0 = s => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+    const mentioned = memoMentionsRecruits_(parsed.memo, roster)
+      .filter(m => norm0(m.name) !== norm0(COLLECTOR_NAME));
     if (mentioned.length === 1) return recruitById_(mentioned[0].rid) || mentioned[0];
     if (mentioned.length > 1) return null;                       // names 2+ recruits → review/split
   }

@@ -29,6 +29,45 @@ function markVenmoProcessedThroughCutoff(){
   return 'Labeled ' + threads.length + ' Venmo threads processed (through 6/19). The poller will now skip these and only pick up payments dated 6/20 onward.';
 }
 
+/* REPAIR: re-credit Venmo rows that were mass-mis-credited to the collector.
+ * Finds every GOOD Venmo row credited to COLLECTOR_NAME whose PayerName is a
+ * DIFFERENT person, then re-matches by the sender: match → reassign to them;
+ * no match → flag for Review. Rows where the collector genuinely paid (payer
+ * is himself, or Logan's covered payment assigned by hand) are untouched, as
+ * are all cash rows. Backs up the Ledger first. Safe to re-run. */
+function fixMiscreditedCollectorRows(){
+  ensureSchema_();
+  const ss  = ss_();
+  const led = sheet_(LEDGER_TAB);
+  led.copyTo(ss).setName('Ledger_bak_' + Utilities.formatDate(new Date(), TIMEZONE, 'yyyyMMdd-HHmmss'));
+
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+  const roster = activeRoster_();
+  const collector = roster.filter(r => norm(r.name) === norm(COLLECTOR_NAME))[0];
+  if (!collector) return 'Collector "' + COLLECTOR_NAME + '" not found on the roster — nothing done.';
+
+  let fixed = 0, toReview = 0;
+  getLedger_().forEach(e => {
+    if (e.review || e.method !== 'Venmo' || e.rid !== collector.rid) return;
+    if (!e.payer || norm(e.payer) === norm(COLLECTOR_NAME)) return;      // he really paid — leave it
+    if (norm(e.payer) === 'logan abele') return;                          // hand-assigned covered payment — leave it
+    const m = matchRecruit_({ payer: e.payer, amount: e.amount, handle: '', memo: '' }, roster);
+    if (m){
+      led.getRange(e.row, LED.RID).setValue(m.rid);
+      led.getRange(e.row, LED.NAME).setValue(m.name);
+      fixed++;
+    } else {
+      led.getRange(e.row, LED.RID).setValue('');
+      led.getRange(e.row, LED.NAME).setValue('');
+      led.getRange(e.row, LED.WEEK).setValue('');
+      led.getRange(e.row, LED.REVIEW).setValue(REVIEW_BAD);
+      toReview++;
+    }
+  });
+  return 'Repair done: ' + fixed + ' row(s) re-credited to their real payer, ' + toReview +
+         ' sent to Review. Collector rows where he actually paid were left alone. Backup tab created.';
+}
+
 // Per-transaction overrides for lines the rules can't read from the note alone.
 //   creditTo → force-credit this recruit (looked up against the roster)
 //   review   → force into the review queue for manual assignment
