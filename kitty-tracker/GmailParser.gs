@@ -164,30 +164,15 @@ function isWholeWeeks_(amount){
   return Math.abs(weeks - Math.round(weeks)) < 0.005;   // clean multiple of WEEKLY_DUES
 }
 
-/* Match a parsed payment to a recruit.
- * The Venmo NOTE wins: when someone pays for someone else, the recipient's name
- * is in the note, not the sender. So we read the note first —
- *   • note clearly names exactly ONE recruit → credit that recruit
- *   • note names TWO+ recruits → no auto-match (let the review/split flow handle it)
- *   • note names no one clearly → fall through to sender matching below.
- * Sender matching (the "paying for self" path): handle, then exact normalized
- * name, then last-name + first-initial. Anything looser -> no match (review). */
+/* Match a parsed payment to a recruit — by the SENDER, never the note.
+ * Venmo's note is scraped from HTML email bodies unreliably, and note-based
+ * crediting mass-mis-credited dues to whoever's name the parser happened to
+ * grab. So we credit the person who actually SENT the money (reliably parsed
+ * from the "X paid you" subject): handle, then exact normalized name, then
+ * last-name + first-initial. Anything looser -> no match (review). Paying for
+ * someone else is surfaced by the Possible Splits panel for manual reassignment;
+ * it is NEVER auto-credited here. */
 function matchRecruit_(parsed, roster){
-  // 0) Note wins. memoMentionsRecruits_ already enforces strict rules (full name,
-  //    or a roster-unique first/last token ≥4 chars), so a single hit is safe to
-  //    credit; multiple hits mean it's a split → send to review.
-  if (parsed.memo){
-    // HARD RULE: the collector (Venmo recipient) can never be credited from a
-    // note. Their name is in every receipt email, so a mention is layout noise,
-    // not "paying for the collector" — dropping it here is the backstop that
-    // makes the mass-mis-credit failure structurally impossible.
-    const norm0 = s => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
-    const mentioned = memoMentionsRecruits_(parsed.memo, roster)
-      .filter(m => norm0(m.name) !== norm0(COLLECTOR_NAME));
-    if (mentioned.length === 1) return recruitById_(mentioned[0].rid) || mentioned[0];
-    if (mentioned.length > 1) return null;                       // names 2+ recruits → review/split
-  }
-
   if (parsed.handle){
     const byH = roster.filter(r => r.venmo && r.venmo === parsed.handle)[0];
     if (byH) return byH;
