@@ -93,18 +93,18 @@ function migrateLedger_(sh){
   }
 }
 
-// One-tap setup: migrate the schema, THEN re-read the Venmo inbox to back-fill
-// PayerName onto existing rows and ingest any previously-missed receipts.
-// Safe to re-run anytime — both halves are idempotent.
+// One-tap setup: create/upgrade the tabs (Roster, Ledger, Expenses), then arm
+// the Venmo poller + reminder triggers. Safe to re-run anytime.
 function setupKitty(){
   ensureSchema_();
-  const back = backfillFromEmails();   // defined in GmailParser.gs
-  return 'Schema ready: Roster, Ledger (v2), Expenses.\n' + back;
+  const trig = installTriggers();      // defined in Triggers.gs
+  return 'Schema ready: Roster, Ledger, Expenses.\n' + trig +
+         '\nNext: add recruits via the sign-up Form (syncFormResponses) and share the web app URL.';
 }
 
 // Schema/migration only — fast, no Gmail scan. This is what runs on dashboard
-// loads and triggers. Use setupKitty() when you also want the email rerun.
-function setupSchemaOnly(){ ensureSchema_(); return 'Schema ready (no email rerun).'; }
+// loads and triggers.
+function setupSchemaOnly(){ ensureSchema_(); return 'Schema ready.'; }
 
 /* ── Time / week math ────────────────────────────────────────────────────── */
 function getCurrentWeek(date){

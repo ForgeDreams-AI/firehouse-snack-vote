@@ -77,25 +77,29 @@ Venmo payments that need a human show up under **Needs Review**:
 - **Dismiss** — removes a row that isn't a dues payment.
 - Person missing from the dropdown? Add them to the **Roster** tab (or via the sign-up Form) and refresh.
 
-## Re-running Venmo under new rules
-Changed the crediting rules and want them applied to recent payments? In the
-Apps Script editor run **`reprocessRecentVenmo`** (function dropdown → Run).
-It:
-- **Backs up the whole Ledger first** to a timestamped `Ledger_bak_…` tab (so
-  it's fully reversible — delete the Ledger and rename the backup back).
-- Re-reads the last **14 days** of Venmo receipts and rebuilds those rows under
-  the current rules (note-wins matching + whole-week auto-credit).
-- **Leaves all cash and manually-entered rows alone** — only email-derived Venmo
-  rows in the window are redone.
+## How Venmo crediting works
+- A receipt is credited to the person who **sent** it (read from the "X paid you"
+  subject) — **never guessed from the note**. That's what keeps dues off the
+  wrong person.
+- **Whole-week amounts** ($20, $40, $60 … up to the season total) auto-credit;
+  odd amounts stop in **Needs Review**.
+- **Paying for someone else** (one person covering others) surfaces in the
+  **Possible Splits** panel — tap **Split** to divide it across the named people.
+- Every Venmo row is keyed by its **transaction ID** (Source column), so
+  re-scans never double-count.
 
-Pass a different window in days, e.g. `reprocessRecentVenmo(30)`. A receipt you'd
-previously hand-split or dismissed will be re-evaluated from scratch (the old
-version is preserved in the backup tab).
+## Occasional maintenance (`Maintenance.gs`)
+- **`catchUpVenmo()`** — re-scan and ingest any receipts the poller missed
+  (idempotent; can't double-count).
+- **`markVenmoProcessedThrough('yyyy/mm/dd')`** — label old receipts processed so
+  the poller skips them (run after pasting a rebuilt Ledger).
+- Rebuilding the Ledger from a downloaded Venmo statement is documented at the
+  top of `Maintenance.gs`.
 
 ## Setup notes (for reference)
-- Run `setupKitty()` once to create/upgrade tabs (Roster, Ledger, Expenses) and
-  back-fill from Venmo emails.
-- Run `installTriggers()` once to schedule the Venmo poller + reminders.
+- Run `setupKitty()` once — creates/upgrades the tabs **and** installs the
+  poller + reminder triggers.
+- For receipts: Editor → **Services** → add **Drive API** (v2).
 - For receipts (Feature 3): Editor → **Services** → add **Drive API** (v2).
 - Sheet tabs: **Roster** (RecruitID, FullName, Email, VenmoHandle, Status, Notes),
   **Ledger** (10 cols, v2), **Expenses** (11 cols).
