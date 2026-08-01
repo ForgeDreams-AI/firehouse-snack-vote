@@ -179,9 +179,13 @@ function matchRecruit_(parsed, roster){
   const collector = norm(COLLECTOR_NAME);
   const notCollector = r => (r && norm(r.name) !== collector) ? r : null;
 
+  // Handle lookup. NOTE: Venmo receipts frequently contain the RECIPIENT's
+  // handle (@TonyJo77) in the body, and extractVenmo_ grabs the first @handle
+  // it sees — so a handle hit on the collector means we grabbed his, not the
+  // sender's. Ignore it and fall through to sender-name matching below.
   if (parsed.handle){
     const byH = roster.filter(r => r.venmo && r.venmo === parsed.handle)[0];
-    if (byH) return notCollector(byH);
+    if (byH && norm(byH.name) !== collector) return byH;
   }
   const p = norm(parsed.payer);
   if (!p) return null;
