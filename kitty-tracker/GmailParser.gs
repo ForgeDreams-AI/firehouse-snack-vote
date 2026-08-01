@@ -172,16 +172,22 @@ function isWholeWeeks_(amount){
  * someone else is surfaced by the Possible Splits panel for manual reassignment;
  * it is NEVER auto-credited here. */
 function matchRecruit_(parsed, roster){
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+  // Guard: the collector (Anthony) is the RECIPIENT of every receipt. If the
+  // parser ever resolves the sender to him, that's a mis-read — send it to
+  // review, never auto-credit him. (He's paid up via cash/manual anyway.)
+  const collector = norm(COLLECTOR_NAME);
+  const notCollector = r => (r && norm(r.name) !== collector) ? r : null;
+
   if (parsed.handle){
     const byH = roster.filter(r => r.venmo && r.venmo === parsed.handle)[0];
-    if (byH) return byH;
+    if (byH) return notCollector(byH);
   }
-  const norm = s => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
   const p = norm(parsed.payer);
   if (!p) return null;
 
   const exact = roster.filter(r => norm(r.name) === p)[0];
-  if (exact) return exact;
+  if (exact) return notCollector(exact);
 
   // last name + first initial (e.g., "j rivera" vs roster "Jose Rivera")
   const pParts = p.split(' ');
@@ -192,7 +198,7 @@ function matchRecruit_(parsed, roster){
       if (rp.length < 2) return false;
       return rp[0][0] === pFirst && rp[rp.length - 1] === pLast;
     });
-    if (cands.length === 1) return cands[0];  // only confident if unique
+    if (cands.length === 1) return notCollector(cands[0]);  // only confident if unique
   }
   return null;
 }
