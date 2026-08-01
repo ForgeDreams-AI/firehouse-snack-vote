@@ -43,13 +43,16 @@ function markVenmoProcessedThrough(beforeYmd){
  * Ledger (e.g. the poller was off). Idempotent: a receipt already in the Ledger
  * (by transaction-ID Source OR a processed Gmail label) is skipped, so this can
  * never double-count. Credits the sender, exactly like the live poller. */
-function catchUpVenmo(){
+function catchUpVenmo(days){
   ensureSchema_();
+  const win       = (days && days > 0) ? Math.floor(days) : 90;
   const label     = getOrCreateLabel_(PROCESSED_LABEL);
   const processed = processedSourceSet_();
   const roster    = activeRoster_();
+  // Search by date, NOT by label — Gmail threads repeat receipts from the same
+  // sender, so a label filter hides later payments in an already-seen thread.
   const threads   = GmailApp.search(
-    'from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you") -label:' + PROCESSED_LABEL, 0, 100);
+    'from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you") newer_than:' + win + 'd', 0, 300);
 
   let added = 0;
   threads.forEach(thread => {
