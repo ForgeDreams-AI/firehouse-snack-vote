@@ -96,7 +96,11 @@ function getDashboardData(){
     }),
     review: review,
     recent: recent,
-    roster: activeRoster_().map(r => ({ rid: r.rid, name: r.name }))  // for assignment + manual logging
+    // Assign/log dropdown — the collector (Anthony) is excluded so he can never
+    // be credited, not even by a manual mis-click.
+    roster: activeRoster_()
+      .filter(r => r.name.trim().toLowerCase() !== COLLECTOR_NAME.trim().toLowerCase())
+      .map(r => ({ rid: r.rid, name: r.name }))
   };
 }
 
