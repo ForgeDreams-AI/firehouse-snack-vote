@@ -7,9 +7,14 @@
 function parseVenmoInbox(){
   ensureSchema_();
   const label = getOrCreateLabel_(PROCESSED_LABEL);
-  // Venmo "X paid you" receipts not yet processed.
-  const query = 'from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you") -label:' + PROCESSED_LABEL;
-  const threads = GmailApp.search(query, 0, 50);
+  /* Search by DATE, never by "-label:processed".
+   * Gmail threads repeat receipts from the same sender into ONE conversation.
+   * Excluding labeled threads therefore hid every later payment in an
+   * already-seen thread — which silently dropped payments from repeat payers.
+   * De-dup is by Gmail message-ID in Ledger.Source (exact), so re-reading a
+   * thread is free and can never double-count. */
+  const query = 'from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you") newer_than:45d';
+  const threads = GmailApp.search(query, 0, 150);
   if (!threads.length) return;
 
   const roster = activeRoster_();
