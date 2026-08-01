@@ -1,69 +1,69 @@
 import React, { useState, useMemo } from "react";
 
-/*  WhoOwes.jsx — PHX FD Kitty balances, Week 9 (dues so far: $180).
- *  Data current as of the July statement + last known cash. Anthony (collector)
- *  is excluded. Drop this component anywhere in a React app: <WhoOwes />        */
+/*  WhoOwes.jsx — PHX FD Kitty balances.
+ *  Source: live Ledger cash + Venmo statement through 7/31. Week 9 ($180 due).
+ *  Anthony (collector) is excluded. Withdrawn members keep the credit for what
+ *  they already paid but are not counted as owing anything.                    */
 
 const WEEK = 9;
-const DUE = WEEK * 20;          // $180 owed-to-date if fully caught up
-const SEASON = 300;             // full-season dues
+const DUE = WEEK * 20;      // $180 owed-to-date to be caught up
+const SEASON = 300;         // full-season dues
 
-// name / paid-to-date / owed-through-this-week
 const MEMBERS = [
-  { name: "Andrew  Dickerson", paid: 60, owe: 120 },
-  { name: "Colton Mendez", paid: 100, owe: 80 },
-  { name: "Djevon Miles", paid: 100, owe: 80 },
-  { name: "Frederick Miller", paid: 100, owe: 80 },
-  { name: "Jeff Ohm", paid: 100, owe: 80 },
-  { name: "Ryan flores", paid: 100, owe: 80 },
-  { name: "Anthony Abruzzini", paid: 120, owe: 60 },
-  { name: "Dylan Yeager", paid: 120, owe: 60 },
-  { name: "Ivan Hernandez", paid: 120, owe: 60 },
-  { name: "Jade Valdez", paid: 120, owe: 60 },
-  { name: "Bailey Busby", paid: 140, owe: 40 },
-  { name: "Branson Mitchell", paid: 140, owe: 40 },
-  { name: "Conner Kitterman", paid: 140, owe: 40 },
-  { name: "Devyn O’Brien", paid: 140, owe: 40 },
-  { name: "DJ Olmstead", paid: 140, owe: 40 },
-  { name: "Humberto Rodriguez", paid: 140, owe: 40 },
-  { name: "Jack Shreiber", paid: 140, owe: 40 },
-  { name: "Kyle Davis", paid: 140, owe: 40 },
-  { name: "Mason Jones", paid: 140, owe: 40 },
-  { name: "Micah Barnett", paid: 140, owe: 40 },
-  { name: "Nicholas Tamborrino", paid: 140, owe: 40 },
-  { name: "William (Garrett) Sayle", paid: 140, owe: 40 },
-  { name: "Joshua salvatierra", paid: 150, owe: 30 },
-  { name: "Alex Mendez", paid: 160, owe: 20 },
-  { name: "Caleb Smyers", paid: 160, owe: 20 },
-  { name: "Caswell Curry", paid: 160, owe: 20 },
-  { name: "Curtis Johnson", paid: 160, owe: 20 },
-  { name: "Dylan urquilla", paid: 160, owe: 20 },
-  { name: "Isen Buntz", paid: 160, owe: 20 },
-  { name: "Jacob Fretto", paid: 160, owe: 20 },
-  { name: "Jacob Mulligan", paid: 160, owe: 20 },
-  { name: "Jakob Hernandez", paid: 160, owe: 20 },
-  { name: "Landon Gillespie", paid: 160, owe: 20 },
-  { name: "Lawrence Nunez", paid: 160, owe: 20 },
-  { name: "Ricardo Garcia", paid: 160, owe: 20 },
-  { name: "Ryan Giordano", paid: 160, owe: 20 },
-  { name: "Tyler Maguire", paid: 160, owe: 20 },
-  { name: "Adrian Centeno Ojeda", paid: 300, owe: 0 },
-  { name: "Alexander Terrian", paid: 300, owe: 0 },
-  { name: "Anthony Weidner", paid: 300, owe: 0 },
-  { name: "Carson reilly", paid: 180, owe: 0 },
-  { name: "Christopher phillips", paid: 320, owe: 0 },
-  { name: "Damon Nguyen", paid: 300, owe: 0 },
-  { name: "Ethan Buckhardt", paid: 180, owe: 0 },
-  { name: "Justin sanchez", paid: 180, owe: 0 },
-  { name: "Kendrick Pulce", paid: 180, owe: 0 },
-  { name: "Megan Hedlund", paid: 300, owe: 0 },
-  { name: "Parker Munier", paid: 200, owe: 0 },
-  { name: "Parker Owens", paid: 180, owe: 0 },
-  { name: "Pat brannan", paid: 300, owe: 0 },
-  { name: "Rayce nichols", paid: 200, owe: 0 },
-  { name: "Ryan Johnson", paid: 180, owe: 0 },
-  { name: "Vincent Leto", paid: 300, owe: 0 },
-  { name: "William Kent Wickware II", paid: 260, owe: 0 },
+  { name: "Ryan flores", paid: 100, withdrawn: true },
+  { name: "Colton Mendez", paid: 100 },
+  { name: "Djevon Miles", paid: 100 },
+  { name: "Frederick Miller", paid: 100 },
+  { name: "Jeff Ohm", paid: 100 },
+  { name: "Anthony Abruzzini", paid: 120 },
+  { name: "Dylan Yeager", paid: 120 },
+  { name: "Ivan Hernandez", paid: 120 },
+  { name: "Jade Valdez", paid: 120 },
+  { name: "Bailey Busby", paid: 140 },
+  { name: "Branson Mitchell", paid: 140 },
+  { name: "Conner Kitterman", paid: 140 },
+  { name: "Devyn O’Brien", paid: 140 },
+  { name: "DJ Olmstead", paid: 140 },
+  { name: "Humberto Rodriguez", paid: 140 },
+  { name: "Jack Shreiber", paid: 140 },
+  { name: "Kyle Davis", paid: 140 },
+  { name: "Mason Jones", paid: 140 },
+  { name: "Micah Barnett", paid: 140 },
+  { name: "Nicholas Tamborrino", paid: 140 },
+  { name: "William (Garrett) Sayle", paid: 140 },
+  { name: "Joshua salvatierra", paid: 150 },
+  { name: "Alex Mendez", paid: 160 },
+  { name: "Andrew  Dickerson", paid: 160 },
+  { name: "Caleb Smyers", paid: 160 },
+  { name: "Caswell Curry", paid: 160 },
+  { name: "Curtis Johnson", paid: 160 },
+  { name: "Dylan urquilla", paid: 160 },
+  { name: "Isen Buntz", paid: 160 },
+  { name: "Jacob Fretto", paid: 160 },
+  { name: "Jacob Mulligan", paid: 160 },
+  { name: "Jakob Hernandez", paid: 160 },
+  { name: "Landon Gillespie", paid: 160 },
+  { name: "Lawrence Nunez", paid: 160 },
+  { name: "Ryan Giordano", paid: 160 },
+  { name: "Tyler Maguire", paid: 160 },
+  { name: "Adrian Centeno Ojeda", paid: 300 },
+  { name: "Alexander Terrian", paid: 300 },
+  { name: "Anthony Weidner", paid: 300 },
+  { name: "Carson reilly", paid: 180 },
+  { name: "Christopher phillips", paid: 320 },
+  { name: "Damon Nguyen", paid: 300 },
+  { name: "Ethan Buckhardt", paid: 180 },
+  { name: "Justin sanchez", paid: 180 },
+  { name: "Kendrick Pulce", paid: 180 },
+  { name: "Megan Hedlund", paid: 300 },
+  { name: "Parker Munier", paid: 200 },
+  { name: "Parker Owens", paid: 180 },
+  { name: "Pat brannan", paid: 300 },
+  { name: "Rayce nichols", paid: 200 },
+  { name: "Ricardo Garcia", paid: 200 },
+  { name: "Ryan Johnson", paid: 180 },
+  { name: "Vincent Leto", paid: 300 },
+  { name: "William Kent Wickware II", paid: 280 },
 ];
 
 const C = {
@@ -71,52 +71,65 @@ const C = {
   line: "#33373F", cream: "#F3EFE7", mut: "#8A909A", good: "#3DBE6B", bad: "#ff6b73",
 };
 
+const money = n => "$" + Number(n).toLocaleString();
+
 export default function WhoOwes() {
   const [q, setQ] = useState("");
+  const [hidePaid, setHidePaid] = useState(false);
 
-  const { list, totalOwed, caughtUp, collected } = useMemo(() => {
-    const list = MEMBERS.filter(m => m.name.toLowerCase().includes(q.toLowerCase()));
-    const totalOwed = MEMBERS.reduce((s, m) => s + m.owe, 0);
-    const caughtUp = MEMBERS.filter(m => m.owe === 0).length;
-    const collected = MEMBERS.reduce((s, m) => s + m.paid, 0);
-    return { list, totalOwed, caughtUp, collected };
-  }, [q]);
+  const stats = useMemo(() => {
+    const active = MEMBERS.filter(m => !m.withdrawn);
+    const owedOf = m => (m.withdrawn ? 0 : Math.max(0, DUE - m.paid));
+    return {
+      owedOf,
+      totalOwed: active.reduce((s, m) => s + owedOf(m), 0),
+      caughtUp: active.filter(m => owedOf(m) === 0).length,
+      activeCount: active.length,
+      collected: MEMBERS.reduce((s, m) => s + m.paid, 0),
+    };
+  }, []);
 
-  const money = n => "$" + Number(n).toLocaleString();
-  const status = m => {
-    if (m.paid >= SEASON) return { label: "Paid in full", kind: "full" };
-    if (m.owe === 0) return { label: m.paid > DUE ? "Ahead" : "Current", kind: "ok" };
-    const wks = Math.round(m.owe / 20);
-    return { label: "Behind " + wks + " wk" + (wks === 1 ? "" : "s"), kind: "late" };
+  const list = useMemo(() => MEMBERS.filter(m =>
+    m.name.toLowerCase().includes(q.toLowerCase()) &&
+    (!hidePaid || stats.owedOf(m) > 0)
+  ), [q, hidePaid, stats]);
+
+  const badge = m => {
+    if (m.withdrawn) return { label: "Withdrawn — no longer owes", color: C.mut };
+    if (m.paid >= SEASON) return { label: "Paid in full", color: C.good };
+    const owe = stats.owedOf(m);
+    if (owe === 0) return { label: m.paid > DUE ? "Ahead" : "Current", color: C.good };
+    return { label: "Behind " + Math.round(owe / 20) + " wk", color: C.bad };
   };
 
   const wrap = { background: C.char, color: C.cream, fontFamily: "-apple-system,Segoe UI,Arial,sans-serif", minHeight: "100vh", padding: 16, boxSizing: "border-box" };
-  const bar = { background: C.char2, border: "1px solid " + C.line, borderRadius: 12, padding: 14, marginBottom: 12 };
-  const chip = { flex: 1, minWidth: 120, background: C.char, border: "1px solid " + C.line, borderRadius: 10, padding: "10px 12px" };
+  const chip = { flex: 1, minWidth: 120, background: C.char2, border: "1px solid " + C.line, borderRadius: 10, padding: "10px 12px" };
   const th = { textAlign: "left", fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: C.mut, padding: "8px 6px", borderBottom: "1px solid " + C.line };
   const td = { padding: "10px 6px", borderBottom: "1px solid " + C.line, fontSize: 14 };
 
   return (
     <div style={wrap}>
-      <div style={bar}>
-        <h1 style={{ fontSize: 18, letterSpacing: 0.5, textTransform: "uppercase", margin: 0 }}>
-          🔥 PHX FD Kitty — Who Owes
-        </h1>
-        <div style={{ color: C.mut, fontSize: 13, marginTop: 4 }}>Week {WEEK} · {money(DUE)} due to date</div>
-      </div>
+      <h1 style={{ fontSize: 18, letterSpacing: 0.5, textTransform: "uppercase", margin: 0 }}>🔥 PHX FD Kitty — Who Owes</h1>
+      <div style={{ color: C.mut, fontSize: 13, margin: "4px 0 14px" }}>Week {WEEK} · {money(DUE)} due to date</div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={chip}><div style={{ fontSize: 10, color: C.mut, textTransform: "uppercase" }}>Outstanding</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: C.bad }}>{money(totalOwed)}</div></div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: C.bad }}>{money(stats.totalOwed)}</div></div>
         <div style={chip}><div style={{ fontSize: 10, color: C.mut, textTransform: "uppercase" }}>Caught up</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: C.good }}>{caughtUp} / {MEMBERS.length}</div></div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: C.good }}>{stats.caughtUp} / {stats.activeCount}</div></div>
         <div style={chip}><div style={{ fontSize: 10, color: C.mut, textTransform: "uppercase" }}>Collected</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{money(collected)}</div></div>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>{money(stats.collected)}</div></div>
       </div>
 
-      <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search a name…"
-        style={{ width: "100%", boxSizing: "border-box", padding: 10, borderRadius: 8, marginBottom: 12,
-          background: C.char, color: C.cream, border: "1px solid " + C.line, fontSize: 14 }} />
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search a name…"
+          style={{ flex: 1, minWidth: 180, padding: 10, borderRadius: 8, background: C.char2, color: C.cream, border: "1px solid " + C.line, fontSize: 14 }} />
+        <button onClick={() => setHidePaid(v => !v)}
+          style={{ padding: "10px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600,
+            background: hidePaid ? C.red : C.char2, color: C.cream, border: "1px solid " + (hidePaid ? C.red : C.line) }}>
+          {hidePaid ? "Showing unpaid only" : "Only show who owes"}
+        </button>
+      </div>
 
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr>
@@ -127,22 +140,24 @@ export default function WhoOwes() {
         </tr></thead>
         <tbody>
           {list.map(m => {
-            const s = status(m);
-            const col = s.kind === "late" ? C.bad : s.kind === "full" ? C.good : C.good;
+            const b = badge(m), owe = stats.owedOf(m);
             return (
-              <tr key={m.name}>
+              <tr key={m.name} style={m.withdrawn ? { opacity: 0.55 } : undefined}>
                 <td style={td}>{m.name}</td>
                 <td style={{ ...td, textAlign: "right" }}>{money(m.paid)}</td>
-                <td style={{ ...td, textAlign: "right", color: m.owe ? C.bad : C.good, fontWeight: 700 }}>{money(m.owe)}</td>
+                <td style={{ ...td, textAlign: "right", fontWeight: 700, color: owe ? C.bad : C.good }}>
+                  {m.withdrawn ? "—" : money(owe)}
+                </td>
                 <td style={td}><span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                  color: col, border: "1px solid " + col + "55", background: col + "18" }}>{s.label}</span></td>
+                  color: b.color, border: "1px solid " + b.color + "55", background: b.color + "18" }}>{b.label}</span></td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
       <div style={{ color: C.mut, fontSize: 11, marginTop: 12 }}>
-        Cash figures as of last statement; Venmo current through July 31. Excludes non-dues payments.
+        Live Ledger cash + Venmo through 7/31. Withdrawn members keep credit for what they paid and are excluded from totals owed.
       </div>
     </div>
   );
