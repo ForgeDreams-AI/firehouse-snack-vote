@@ -31,7 +31,7 @@ const MEMBERS = [
   { name: "Micah Barnett", paid: 140 },
   { name: "Nicholas Tamborrino", paid: 140 },
   { name: "William (Garrett) Sayle", paid: 140 },
-  { name: "Joshua salvatierra", paid: 150 },
+  { name: "Joshua salvatierra", paid: 160 },
   { name: "Alex Mendez", paid: 160 },
   { name: "Andrew  Dickerson", paid: 160 },
   { name: "Caleb Smyers", paid: 160 },
