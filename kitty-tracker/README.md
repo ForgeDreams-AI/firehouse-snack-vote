@@ -1,105 +1,72 @@
-# PHX FD Academy Kitty Tracker
+# Kitty Tracker
 
-A separate **Google Apps Script web app** (not part of the snack-vote site) that
-tracks weekly dues for 55 recruits: logs cash/Venmo payments, parses Venmo
-"paid you" emails automatically, sends dues reminders, and (Feature 3) logs
-Costco receipts and emails an itemized spend report.
+Tracks weekly dues for a fire academy class. Venmo payments record themselves
+from Gmail; cash and corrections happen on a dashboard. Google Sheet is the
+database, Apps Script is the whole backend — nothing to host, nothing to pay for.
 
-> This folder is a **backup + paste source** for the Apps Script project. The
-> live app runs inside Google Apps Script (bound to the *KittyPayments* sheet),
-> not from this repo. Edit there by copy-pasting these files in.
+---
 
-## Files (paste each into the matching Apps Script file)
+## Handing it to the next class
 
-| File | Role |
-|------|------|
-| `Config.gs` | Constants: season dates, dues, tabs, columns, reminder schedule. |
-| `SheetService.gs` | All sheet reads/writes; schema bootstrap + v1→v2 migration. |
-| `GmailParser.gs` | Time-driven Venmo email parser + backfill. |
-| `Reminders.gs` | Dues-reminder send engine + email templates. |
-| `WebApp.gs` | `doGet` + every `google.script.run` dashboard endpoint. |
-| `Triggers.gs` | `installTriggers()` — run once to schedule everything. |
-| `FormIntake.gs` | Pull recruit sign-ups from a linked Google Form into Roster. |
-| `Expenses.gs` | Receipt upload → free Drive OCR → parse → reconcile → write. |
-| `ReceiptReport.gs` | Build + send the itemized spend report email. |
-| `dashboard.html` | The operator dashboard UI (this is the file that was crashing). |
+1. Open `Config.gs` and edit the **SETTINGS** block at the top — collector name,
+   their Venmo handle and email, season start date, weeks, weekly dues.
+   *That block is the only thing you should ever need to change.*
+2. Run **`setUpKitty()`** once. It builds the tabs and installs every trigger.
+3. Link the sign-up Google Form to this spreadsheet, then run
+   **`syncFormResponses()`** to fill the Roster.
+4. Deploy the web app (Deploy → New deployment → Web app) and share the URL.
 
-## The crash that was fixed (dashboard.html)
+That's it. It runs itself from there.
 
-The dashboard's payment modal called JavaScript functions that **did not exist**,
-so opening **+ Log Payment** and tapping a method or **Log payment** threw a
-`ReferenceError` and the page died. Fixed in this version:
+---
 
-| Was broken | Fix |
-|------------|-----|
-| `onModalRecruit()`, `setMethod()`, `amtTouched()`, `logPay()` referenced but never defined | Implemented all four; modal now logs cash/Venmo with the multi-week picker, custom amount, and "paid by" |
-| Week-picker never rendered | `renderWeeks()` builds week buttons; already-covered weeks are greyed |
-| `drillDown('+r.rid+')` → `drillDown(R001)` (rid not quoted) | rid is now quoted; drill-down loads full history via `getRecruitPaymentsWeb` |
-| `r.weeksConvered` typo → blank Weeks column | uses `r.weeksCovered` |
-| `r.statusLabel` (server sends `status`) → wrong badge | uses `r.status` + colored badge |
-| Review queue had no actions | Added **Assign**, **Split** (with live balance check), and **Dismiss** |
-| No pause control | Added a **Pause/Resume reminders** button |
-| No receipt UI (backend existed, dashboard didn't use it) | Added an **Add Receipt** flow: upload → Drive OCR → edit items/tax/total with live reconcile → **Save & email** the spend report (`uploadReceiptWeb`/`confirmReceiptWeb`) |
+## How money gets credited
 
-The backend `.gs` files were **not the problem** and are unchanged from what's
-deployed — they're saved here verbatim for backup.
+- **Credit follows the sender.** Whoever the receipt says paid gets the credit,
+  read from the "*X paid you*" subject line — the only field Venmo writes
+  reliably. The typed note is stored for reference but never decides credit.
+- **The collector is never auto-credited.** Their name and @handle are on every
+  receipt, so any match on them is ignored.
+- **Only whole-week amounts auto-credit** ($20, $40, $60 …). Odd amounts wait in
+  the dashboard's review queue.
+- **Duplicates are impossible.** Every payment is fingerprinted by
+  date + payer + amount, so the poller and a statement import can't both record
+  the same payment.
+- **Paying for someone else** shows up in the dashboard's *Possible Splits*
+  panel — tap **Split** to divide it across the people named.
 
-> **Receipt OCR needs the Drive advanced service:** Apps Script editor →
-> **Services (+) → Drive API (v2)**, then re-run any function once to approve the
-> new permissions. Without it, uploads still save the file and you type the items
-> in by hand.
+## Day to day
 
-### To deploy the fix
-1. Apps Script editor → open the `dashboard.html` file.
-2. Select all, delete, paste the contents of this folder's `dashboard.html`.
-3. Save. **Deploy → Manage deployments → Edit → New version → Deploy** (keep the
-   same `/exec` URL).
+Nothing. The poller runs every 15 minutes; reminders send themselves. Use the
+dashboard to log cash, clear the review queue, split payments and add receipts.
 
-## How Venmo payments get credited
-The parser reads the **note** on each Venmo receipt to decide who gets credited:
-- **Paying for yourself** — the note is empty/generic, so the payment is credited
-  to whoever the **sender** matches on the roster (handle or name).
-- **Paying for someone else** — the note clearly names **one** recruit (e.g.
-  "Jake's week 3"), so that recruit is credited and the actual sender is kept as
-  the **PayerName** ("paid by …"). The note wins over the sender here.
-- **Note names two+ recruits**, or no one clearly → held in **Needs Review** so
-  you can assign/split it by hand.
+## If the numbers look wrong
 
-On top of that, a receipt only **auto-credits** when the amount is a **clean
-whole-week multiple of $20** — $20, $40, $60 … up to the $300 season total. Odd
-amounts that don't divide evenly ($30, $50, $70) and anything over the season
-total are held in **Needs Review** so you can confirm/split them before they
-count. Payments the parser couldn't match to a recruit also land here.
+Everything you can run by hand lives in **`Admin.gs`**:
 
-Venmo payments that need a human show up under **Needs Review**:
-- **Assign** — pick the recruit in the dropdown, click **Assign**. Credits them, clears the review.
-- **Split** — one payment that covered several recruits: click **Split**, **+ Add recruit** for each, enter amounts (and optional weeks like `1,2`); the **Remaining** must read `$0.00 ✓ balanced`, then **Save split**.
-- **Dismiss** — removes a row that isn't a dues payment.
-- Person missing from the dropdown? Add them to the **Roster** tab (or via the sign-up Form) and refresh.
+| Function | What it does |
+|---|---|
+| `importVenmoStatement()` | **The fix-everything button.** Paste a downloaded Venmo statement into a tab named `StatementImport`, run this, and all Venmo is rebuilt from the bank's own record. Cash is never touched. |
+| `recheckCredits()` | Re-applies the crediting rules to existing rows (use after changing the collector or fixing a roster name). |
+| `removeDuplicatePayments()` | Clears duplicates left by an old bad import. |
+| `previewVenmoParsing()` | Shows what the parser reads from recent receipts, without writing anything. |
+| `installTriggers()` / `removeTriggers()` | Turn the automation on or off. |
 
-## How Venmo crediting works
-- A receipt is credited to the person who **sent** it (read from the "X paid you"
-  subject) — **never guessed from the note**. That's what keeps dues off the
-  wrong person.
-- **Whole-week amounts** ($20, $40, $60 … up to the season total) auto-credit;
-  odd amounts stop in **Needs Review**.
-- **Paying for someone else** (one person covering others) surfaces in the
-  **Possible Splits** panel — tap **Split** to divide it across the named people.
-- Every Venmo row is keyed by its **transaction ID** (Source column), so
-  re-scans never double-count.
+Every one backs the Ledger up to a timestamped tab first and is safe to re-run.
 
-## Occasional maintenance (`Maintenance.gs`)
-- **`catchUpVenmo()`** — re-scan and ingest any receipts the poller missed
-  (idempotent; can't double-count).
-- **`markVenmoProcessedThrough('yyyy/mm/dd')`** — label old receipts processed so
-  the poller skips them (run after pasting a rebuilt Ledger).
-- Rebuilding the Ledger from a downloaded Venmo statement is documented at the
-  top of `Maintenance.gs`.
+---
 
-## Setup notes (for reference)
-- Run `setupKitty()` once — creates/upgrades the tabs **and** installs the
-  poller + reminder triggers.
-- For receipts: Editor → **Services** → add **Drive API** (v2).
-- For receipts (Feature 3): Editor → **Services** → add **Drive API** (v2).
-- Sheet tabs: **Roster** (RecruitID, FullName, Email, VenmoHandle, Status, Notes),
-  **Ledger** (10 cols, v2), **Expenses** (11 cols).
+## Files
+
+| File | Contains |
+|---|---|
+| `Config.gs` | All settings. The only file you edit for a new class. |
+| `Venmo.gs` | Reads receipts from Gmail and credits them. All crediting rules. |
+| `SheetService.gs` | Tab schema and every read/write to the sheet. |
+| `WebApp.gs` + `dashboard.html` | The dashboard. |
+| `Reminders.gs` | Weekly reminder emails. |
+| `Expenses.gs` + `ReceiptReport.gs` | Receipt scanning and spend reports. |
+| `FormIntake.gs` | Sign-up Form → Roster. |
+| `Admin.gs` | Setup, triggers and every by-hand repair tool. |
+
+Tabs: **Roster** · **Ledger** · **Expenses** (plus `Ledger_bak_*` safety copies).

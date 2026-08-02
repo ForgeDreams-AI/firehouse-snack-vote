@@ -93,17 +93,7 @@ function migrateLedger_(sh){
   }
 }
 
-// One-tap setup: create/upgrade the tabs (Roster, Ledger, Expenses), then arm
-// the Venmo poller + reminder triggers. Safe to re-run anytime.
-function setupKitty(){
-  ensureSchema_();
-  const trig = installTriggers();      // defined in Triggers.gs
-  return 'Schema ready: Roster, Ledger, Expenses.\n' + trig +
-         '\nNext: add recruits via the sign-up Form (syncFormResponses) and share the web app URL.';
-}
-
-// Schema/migration only — fast, no Gmail scan. This is what runs on dashboard
-// loads and triggers.
+// Schema/migration only — fast, no Gmail scan. Runs on dashboard loads.
 function setupSchemaOnly(){ ensureSchema_(); return 'Schema ready.'; }
 
 /* ── Time / week math ────────────────────────────────────────────────────── */
