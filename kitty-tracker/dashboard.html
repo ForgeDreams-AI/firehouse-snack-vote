@@ -203,6 +203,19 @@ function render(d){
   h += '</div>';
   h += '<div class="meter"><div class="meterfill" style="width:'+pct+'%"></div></div>';
   h += '<div style="text-align:right;font-size:11px;color:var(--mut);margin:4px 0 8px">'+pct+'% collected</div>';
+  // Reconciliation bar — green when every dollar received is credited.
+  if(d.recon){
+    const R = d.recon;
+    h += '<div style="margin:8px 0;padding:9px 12px;border-radius:9px;font-size:13px;'
+      +  'background:'+(R.ok?'#103a22':'#3a1414')+';border:1px solid '+(R.ok?'#1d6e40':'#6e1d1d')+';'
+      +  'color:'+(R.ok?'var(--good)':'#ff6b73')+'">'
+      +  (R.ok
+          ? '\u2713 <b>Books balance</b> — '+money(R.received)+' received via Venmo, all of it credited.'
+          : '\u26a0 <b>Out of balance by '+money(Math.abs(R.difference))+'</b> — '+money(R.received)
+            +' received, '+money(R.credited)+' credited. '
+            +(R.difference>0?'Duplicates: re-run importVenmoStatement().':'Unallocated: check Needs Review.'))
+      +  '</div>';
+  }
   h += '<div class="acts"><button class="go" onclick="openModal()">+ Log Payment</button>'
     +  '<button onclick="openReceipt()">📁 Add Receipt</button>'
     +  '<button onclick="openOwes()">📋 Who Owes</button></div>';

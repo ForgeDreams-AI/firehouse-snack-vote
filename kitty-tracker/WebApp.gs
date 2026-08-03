@@ -54,6 +54,7 @@ function getDashboardData(){
   // Possible-splits panel: every credited Venmo whose memo names another
   // recruit. The dashboard surfaces these for one-click re-attribution.
   const suggestions = splitSuggestions_();
+  const recon = reconcile_();   // does the Ledger match the bank's record?
 
   return {
     week: week, seasonWeeks: SEASON_WEEKS, closed: seasonClosed(),
@@ -66,6 +67,7 @@ function getDashboardData(){
     moneyIn: { cash: round2_(cashIn), venmo: round2_(venmoIn), total: collected },
     kitty:   { collected: collected, spent: spent, balance: balance },
     splitSuggestions: suggestions,
+    recon: recon,
     rows: rows.map(r => {
       const paid = r.paid;
       const rawWeeks = Math.floor(paid / WEEKLY_DUES);

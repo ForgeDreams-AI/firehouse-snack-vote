@@ -20,6 +20,20 @@ That's it. It runs itself from there.
 
 ---
 
+## How the money model works
+
+Two tables, one job each — this separation is what makes it hard to get wrong:
+
+| Tab | Holds |
+|---|---|
+| **Payments** | What actually arrived. One row per real transaction, keyed by Venmo's own ID. Never edited — this is the bank's record. |
+| **Ledger** | Who got the credit. A payment covering three people makes three rows. Editable; all human judgment lives here. |
+
+The dashboard shows a **reconciliation bar**: green when the Ledger's Venmo rows
+sum to the Payments tab, red the moment they drift. Run `checkTheBooks()` any
+time for the same check. If it's green, the money is right and any remaining
+problem is just attribution.
+
 ## How money gets credited
 
 - **Credit follows the sender.** Whoever the receipt says paid gets the credit,
@@ -32,8 +46,11 @@ That's it. It runs itself from there.
 - **Duplicates are impossible.** Every payment is fingerprinted by
   date + payer + amount, so the poller and a statement import can't both record
   the same payment.
-- **Paying for someone else** shows up in the dashboard's *Possible Splits*
-  panel — tap **Split** to divide it across the people named.
+- **Paying for someone else is automatic.** A statement note that names other
+  recruits ("Kyle Davis, Ivan Hernandez", "for rico", "me and Carson") splits
+  the payment across them. Nicknames live in the **Aliases** tab — add a row
+  instead of fixing payments by hand. Anything that doesn't divide evenly goes
+  to review rather than being guessed at.
 
 ## Day to day
 

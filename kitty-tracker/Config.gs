@@ -63,6 +63,27 @@ const EXP = { TS: 1, PID: 2, VENDOR: 3, ITEM: 4, QTY: 5, UNIT: 6, LINE: 7, TAX: 
 const EXPENSES_HEADERS = ['Timestamp', 'PurchaseID', 'Vendor', 'ItemName', 'Qty', 'UnitPrice',
                           'LineTotal', 'Tax', 'PurchaseTotal', 'ReceiptFileURL', 'Notes'];
 
+/* Payments tab — the money that actually arrived, one row per real transaction.
+ * NEVER edited by hand: it's the bank's record. The Ledger holds who each
+ * payment was credited to, and must sum back to this. That's the reconciliation
+ * check that catches every drift. */
+const PAYMENTS_TAB = 'Payments';
+const PAY = { ID: 1, DATE: 2, METHOD: 3, PAYER: 4, AMOUNT: 5, NOTE: 6, ALLOC: 7 };
+const PAYMENTS_HEADERS = ['PaymentID', 'Date', 'Method', 'Payer', 'Amount', 'Note', 'Allocated'];
+
+/* Aliases tab — nicknames people use in Venmo notes. "for rico" -> Ricardo
+ * Garcia. Edit this instead of hand-fixing rows. */
+const ALIASES_TAB = 'Aliases';
+const ALIASES_HEADERS = ['Nickname', 'RosterFullName'];
+// Seeded on first setup; edit the tab afterwards, not this list.
+const DEFAULT_ALIASES = [
+  ['rico',  'Ricardo Garcia'],
+  ['will',  'William Kent Wickware II'],
+  ['dev',   'Devyn O’Brien'],
+  ['cj',    'Caswell Curry'],
+  ['jake',  'Jacob Fretto']
+];
+
 /* Ledger "Payment Status" wording. Reads also understand legacy true/false. */
 const REVIEW_GOOD = 'Payment Good!';
 const REVIEW_BAD  = 'Payment Bad!';

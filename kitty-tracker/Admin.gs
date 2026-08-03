@@ -72,32 +72,35 @@ function listTriggers(){
 
 /* ── The fix-everything button ────────────────────────────────────────── */
 
-/** Rebuild every Venmo row from a downloaded Venmo statement.
+/** Rebuild ALL Venmo from a downloaded Venmo statement. The fix-everything button.
  *
  *  WHEN: any time the numbers look wrong. The statement is the bank's own
  *  record, so this is always safe to fall back on.
  *
  *  HOW:
  *    1. Venmo app/site -> Statement -> download the CSV for the season.
- *    2. In this spreadsheet, add a tab named exactly "StatementImport" and
- *       paste the CSV into it (File -> Import -> Insert new sheet works too).
- *    3. Run this function.
+ *    2. Put it in a tab named exactly "StatementImport"
+ *       (File -> Import -> Insert new sheet, then rename the tab).
+ *    3. Run this.
  *
- *  Deletes existing Venmo rows and reloads them from the statement, credited
- *  by sender with each payment's real date. CASH ROWS ARE NEVER TOUCHED.
- *  Paying-for-someone-else lands in the dashboard's split panel as usual. */
+ *  Writes every payment to the Payments tab (the bank's record), then allocates
+ *  each one to whoever it was for — reading the note for named recruits and
+ *  Aliases, falling back to the sender. Anything it can't resolve confidently
+ *  goes to the review queue rather than being guessed at.
+ *
+ *  CASH IS NEVER TOUCHED. Finishes by reconciling the two tables. */
 function importVenmoStatement(){
   ensureSchema_();
   const ss  = ss_();
   const tab = ss.getSheetByName('StatementImport');
-  if (!tab) return 'No "StatementImport" tab found. Paste the Venmo statement CSV into a tab with that exact name, then run this again.';
+  if (!tab) return logAndReturn_('No "StatementImport" tab found. Put the Venmo statement CSV in a tab with that exact name, then run this again.');
 
   const rows = tab.getDataRange().getValues();
-  if (rows.length < 2) return 'The StatementImport tab is empty.';
+  if (rows.length < 2) return logAndReturn_('The StatementImport tab is empty.');
 
-  // Locate the columns by header, wherever Venmo put them.
+  // Find the header row wherever Venmo put it.
   let hdr = -1, col = {};
-  for (let i = 0; i < Math.min(rows.length, 10); i++){
+  for (let i = 0; i < Math.min(rows.length, 12); i++){
     const cells = rows[i].map(c => String(c).trim().toLowerCase());
     if (cells.indexOf('datetime') >= 0 && cells.indexOf('from') >= 0){
       hdr = i;
@@ -108,81 +111,102 @@ function importVenmoStatement(){
       break;
     }
   }
-  if (hdr < 0) return 'Could not find the statement header row (needs "Datetime" and "From" columns).';
+  if (hdr < 0) return logAndReturn_('Could not find the statement header row (needs "Datetime" and "From" columns).');
 
   const backup = 'Ledger_bak_' + Utilities.formatDate(new Date(), TIMEZONE, 'yyyyMMdd-HHmmss');
   const led = sheet_(LEDGER_TAB);
   led.copyTo(ss).setName(backup);
 
-  // Drop existing Venmo rows only, bottom-up so indexes stay valid.
+  // Clear ALL Venmo — both tables. Cash rows stay exactly as they are.
   getLedger_().filter(e => e.method === 'Venmo')
               .map(e => e.row).sort((a, b) => b - a)
               .forEach(r => led.deleteRow(r));
+  const paySheet = sheet_(PAYMENTS_TAB);
+  if (paySheet.getLastRow() > 1) paySheet.deleteRows(2, paySheet.getLastRow() - 1);
 
-  const roster = activeRoster_();
-  let credited = 0, review = 0, total = 0;
-
-  /* Build every row in memory, then write once. Appending row-by-row re-reads
-   * the whole Ledger for each payment, which on a full season crawls toward the
-   * 6-minute execution limit. */
-  const out = [];
-  const covered = {};                                   // running total per recruit
+  const roster  = activeRoster_();
+  const aliases = getAliases_();
+  const payRows = [], ledRows = [];
+  const covered = {};
+  let total = 0, credited = 0, review = 0, split = 0;
 
   for (let i = hdr + 1; i < rows.length; i++){
     const r = rows[i];
     if (String(r[col.type]).trim() !== 'Payment') continue;
     if (String(r[col.status]).trim() !== 'Complete') continue;
-
-    const raw = String(r[col.amt]);
-    const m = raw.match(/\+\s*\$?\s*([\d,]+\.?\d*)/);
-    if (!m) continue;                                   // outgoing / transfers
+    const m = String(r[col.amt]).match(/\+\s*\$?\s*([\d,]+\.?\d*)/);
+    if (!m) continue;                                     // outgoing / transfers
     const amount = parseFloat(m[1].replace(/,/g, ''));
     if (!(amount > 0)) continue;
 
     const when  = new Date(String(r[col.dt]));
+    const stamp = Utilities.formatDate(when, TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
     const payer = String(r[col.from]).trim();
     const note  = String(r[col.note] || '').trim();
-    const srcId = String(r[col.id] || '').trim();
-
-    const match = matchSender_({ payer: payer, amount: amount, handle: '', memo: note }, roster);
-    const ok    = match && isWholeWeeks_(amount);
-
-    let week = '';
-    if (ok){
-      covered[match.rid] = (covered[match.rid] || 0) + amount;
-      const w = Math.floor(covered[match.rid] / WEEKLY_DUES);
-      week = (w > getCurrentWeek()) ? 'Prepay' : String(Math.max(1, w));
-    }
-
-    const row = [];
-    row[LED.TS - 1]     = Utilities.formatDate(when, TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
-    row[LED.RID - 1]    = ok ? match.rid  : '';
-    row[LED.NAME - 1]   = ok ? match.name : '';
-    row[LED.METHOD - 1] = 'Venmo';
-    row[LED.AMOUNT - 1] = amount;
-    row[LED.WEEK - 1]   = week;
-    row[LED.PAYER - 1]  = payer;
-    row[LED.SOURCE - 1] = srcId;
-    row[LED.SPLIT - 1]  = '';
-    row[LED.REVIEW - 1] = ok ? REVIEW_GOOD : REVIEW_BAD;
-    row[LED.MEMO - 1]   = note;
-    out.push(row);
-
+    const id    = String(r[col.id] || '').trim();
     total += amount;
-    if (ok) credited++; else review++;
+
+    const parts = allocatePayment_({ payer: payer, amount: amount, note: note }, roster, aliases);
+
+    const payRow = [];
+    payRow[PAY.ID - 1]     = id;
+    payRow[PAY.DATE - 1]   = stamp;
+    payRow[PAY.METHOD - 1] = 'Venmo';
+    payRow[PAY.PAYER - 1]  = payer;
+    payRow[PAY.AMOUNT - 1] = amount;
+    payRow[PAY.NOTE - 1]   = note;
+    payRow[PAY.ALLOC - 1]  = parts.length ? parts.map(p => p.name).join(', ') : 'NEEDS REVIEW';
+    payRows.push(payRow);
+
+    if (!parts.length){                                   // couldn't resolve -> review
+      ledRows.push(ledgerRow_(stamp, '', '', amount, '', payer, id, '', REVIEW_BAD, note));
+      review++;
+      continue;
+    }
+    if (parts.length > 1) split++;
+    const group = parts.length > 1 ? 'S' + id.slice(-8) : '';
+    parts.forEach(p => {
+      covered[p.rid] = (covered[p.rid] || 0) + p.amount;
+      const w = Math.floor(covered[p.rid] / WEEKLY_DUES);
+      const week = (w > getCurrentWeek()) ? 'Prepay' : String(Math.max(1, w));
+      ledRows.push(ledgerRow_(stamp, p.rid, p.name, p.amount, week, payer, id, group, REVIEW_GOOD, note));
+    });
+    credited++;
   }
 
-  if (out.length){
-    led.getRange(led.getLastRow() + 1, 1, out.length, LEDGER_HEADERS.length).setValues(out);
-  }
+  if (payRows.length) paySheet.getRange(2, 1, payRows.length, PAYMENTS_HEADERS.length).setValues(payRows);
+  if (ledRows.length) led.getRange(led.getLastRow() + 1, 1, ledRows.length, LEDGER_HEADERS.length).setValues(ledRows);
 
-  const msg = 'Rebuilt Venmo from the statement: $' + total.toFixed(2) + ' across ' +
-              (credited + review) + ' payments (' + credited + ' credited, ' + review +
-              ' to review). Cash untouched. Backup: "' + backup + '".\n' +
-              'Compare that total to the statement — they should match exactly.';
-  Logger.log(msg);          // return values don't show in the editor's log; this does
-  return msg;
+  const rec = reconcile_();
+  return logAndReturn_(
+    'Rebuilt Venmo from the statement.\n' +
+    '  Received:   $' + total.toFixed(2) + ' across ' + payRows.length + ' payments\n' +
+    '  Allocated:  ' + credited + ' payments (' + split + ' covering more than one person)\n' +
+    '  To review:  ' + review + '\n' +
+    '  Backup:     "' + backup + '"\n\n' +
+    (rec.ok ? 'BOOKS BALANCE ✓ — every dollar received is credited to somebody.\n'
+            : 'OUT OF BALANCE by $' + rec.difference.toFixed(2) + ' — run checkTheBooks().\n') +
+    'Compare $' + total.toFixed(2) + ' to the statement total. Cash untouched.');
 }
+
+/* Build one Ledger row in column order. */
+function ledgerRow_(ts, rid, name, amount, week, payer, source, group, status, memo){
+  const row = [];
+  row[LED.TS - 1]     = ts;
+  row[LED.RID - 1]    = rid;
+  row[LED.NAME - 1]   = name;
+  row[LED.METHOD - 1] = 'Venmo';
+  row[LED.AMOUNT - 1] = amount;
+  row[LED.WEEK - 1]   = week;
+  row[LED.PAYER - 1]  = payer;
+  row[LED.SOURCE - 1] = source;
+  row[LED.SPLIT - 1]  = group;
+  row[LED.REVIEW - 1] = status;
+  row[LED.MEMO - 1]   = memo;
+  return row;
+}
+
+function logAndReturn_(msg){ Logger.log(msg); return msg; }
 
 
 /* ── Repairs ──────────────────────────────────────────────────────────── */

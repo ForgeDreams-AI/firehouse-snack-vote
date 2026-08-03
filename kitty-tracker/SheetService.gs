@@ -27,9 +27,26 @@ function ensureSchema_(){
     migrateLedger_(led);
   }
 
-  // Expenses (new in v2)
+  // Expenses
   let exp = ss.getSheetByName(EXPENSES_TAB);
   if (!exp){ exp = ss.insertSheet(EXPENSES_TAB); exp.getRange(1, 1, 1, EXPENSES_HEADERS.length).setValues([EXPENSES_HEADERS]); }
+
+  // Payments — the bank's record of what arrived (see Payments.gs).
+  let pay = ss.getSheetByName(PAYMENTS_TAB);
+  if (!pay){
+    pay = ss.insertSheet(PAYMENTS_TAB);
+    pay.getRange(1, 1, 1, PAYMENTS_HEADERS.length).setValues([PAYMENTS_HEADERS]);
+    pay.setFrozenRows(1);
+  }
+
+  // Aliases — nicknames used in Venmo notes ("rico" -> Ricardo Garcia).
+  let ali = ss.getSheetByName(ALIASES_TAB);
+  if (!ali){
+    ali = ss.insertSheet(ALIASES_TAB);
+    ali.getRange(1, 1, 1, ALIASES_HEADERS.length).setValues([ALIASES_HEADERS]);
+    ali.getRange(2, 1, DEFAULT_ALIASES.length, 2).setValues(DEFAULT_ALIASES);
+    ali.setFrozenRows(1);
+  }
 }
 
 /* Upgrade an existing Ledger to the current column layout.
