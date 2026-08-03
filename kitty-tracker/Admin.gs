@@ -28,10 +28,12 @@
 function setUpKitty(){
   ensureSchema_();
   const t = installTriggers();
-  return 'Tabs ready (Roster, Ledger, Expenses).\n' + t +
+  const msg = 'Tabs ready (Roster, Ledger, Expenses).\n' + t +
          '\nCollector: ' + COLLECTOR_NAME + ' (' + COLLECTOR_VENMO + ')' +
          '\nSeason: ' + SEASON_START + ' + ' + SEASON_WEEKS + ' weeks at $' + WEEKLY_DUES +
          '\nNext: link the sign-up Form and run syncFormResponses().';
+  Logger.log(msg);
+  return msg;
 }
 
 /** Install/refresh every trigger: the Venmo poller and the reminder slots. */
@@ -46,14 +48,18 @@ function installTriggers(){
       .onWeekDay(ScriptApp.WeekDay[day]).atHour(hour).nearMinute(minute)
       .inTimezone(TIMEZONE).create();
   });
-  return 'Triggers installed: Venmo poller every ' + GMAIL_POLL_MINUTES +
+  const msg = 'Triggers installed: Venmo poller every ' + GMAIL_POLL_MINUTES +
          ' min + ' + REMINDER_SLOTS.length + ' reminder slots.';
+  Logger.log(msg);
+  return msg;
 }
 
 function removeTriggers(){
   const n = ScriptApp.getProjectTriggers().length;
   ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
-  return 'Removed ' + n + ' trigger(s). The tracker is now idle.';
+  const msg = 'Removed ' + n + ' trigger(s). The tracker is now idle.';
+  Logger.log(msg);
+  return msg;
 }
 
 function listTriggers(){
@@ -116,6 +122,12 @@ function importVenmoStatement(){
   const roster = activeRoster_();
   let credited = 0, review = 0, total = 0;
 
+  /* Build every row in memory, then write once. Appending row-by-row re-reads
+   * the whole Ledger for each payment, which on a full season crawls toward the
+   * 6-minute execution limit. */
+  const out = [];
+  const covered = {};                                   // running total per recruit
+
   for (let i = hdr + 1; i < rows.length; i++){
     const r = rows[i];
     if (String(r[col.type]).trim() !== 'Payment') continue;
@@ -132,22 +144,44 @@ function importVenmoStatement(){
     const note  = String(r[col.note] || '').trim();
     const srcId = String(r[col.id] || '').trim();
 
-    const parsed = { payer: payer, amount: amount, handle: '', memo: note };
-    const match  = matchSender_(parsed, roster);
-    const ok     = match && isWholeWeeks_(amount);
+    const match = matchSender_({ payer: payer, amount: amount, handle: '', memo: note }, roster);
+    const ok    = match && isWholeWeeks_(amount);
 
-    appendPayment_(ok ? match.rid : '', ok ? match.name : '', 'Venmo', amount, srcId, !ok,
-      { payer: payer, memo: note,
-        ts: Utilities.formatDate(when, TIMEZONE, 'yyyy-MM-dd HH:mm:ss') });
+    let week = '';
+    if (ok){
+      covered[match.rid] = (covered[match.rid] || 0) + amount;
+      const w = Math.floor(covered[match.rid] / WEEKLY_DUES);
+      week = (w > getCurrentWeek()) ? 'Prepay' : String(Math.max(1, w));
+    }
+
+    const row = [];
+    row[LED.TS - 1]     = Utilities.formatDate(when, TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+    row[LED.RID - 1]    = ok ? match.rid  : '';
+    row[LED.NAME - 1]   = ok ? match.name : '';
+    row[LED.METHOD - 1] = 'Venmo';
+    row[LED.AMOUNT - 1] = amount;
+    row[LED.WEEK - 1]   = week;
+    row[LED.PAYER - 1]  = payer;
+    row[LED.SOURCE - 1] = srcId;
+    row[LED.SPLIT - 1]  = '';
+    row[LED.REVIEW - 1] = ok ? REVIEW_GOOD : REVIEW_BAD;
+    row[LED.MEMO - 1]   = note;
+    out.push(row);
 
     total += amount;
     if (ok) credited++; else review++;
   }
 
-  return 'Rebuilt Venmo from the statement: $' + total.toFixed(2) + ' across ' +
-         (credited + review) + ' payments (' + credited + ' credited, ' + review +
-         ' to review). Cash untouched. Backup: "' + backup + '".\n' +
-         'Compare that total to the statement — they should match exactly.';
+  if (out.length){
+    led.getRange(led.getLastRow() + 1, 1, out.length, LEDGER_HEADERS.length).setValues(out);
+  }
+
+  const msg = 'Rebuilt Venmo from the statement: $' + total.toFixed(2) + ' across ' +
+              (credited + review) + ' payments (' + credited + ' credited, ' + review +
+              ' to review). Cash untouched. Backup: "' + backup + '".\n' +
+              'Compare that total to the statement — they should match exactly.';
+  Logger.log(msg);          // return values don't show in the editor's log; this does
+  return msg;
 }
 
 
@@ -195,8 +229,10 @@ function recheckCredits(){
     }
   });
   rng.setValues(vals);
-  return 'Re-checked credits: ' + moved + ' moved to the correct sender, ' +
+  const msg = 'Re-checked credits: ' + moved + ' moved to the correct sender, ' +
          toReview + ' sent to review. Backup: "' + backup + '".';
+  Logger.log(msg);
+  return msg;
 }
 
 
@@ -218,6 +254,8 @@ function removeDuplicatePayments(){
     else seen[fp] = true;
   });
   drop.sort((a, b) => b - a).forEach(r => led.deleteRow(r));
-  return 'Removed ' + drop.length + ' duplicate row(s) worth $' + dropped.toFixed(2) +
+  const msg = 'Removed ' + drop.length + ' duplicate row(s) worth $' + dropped.toFixed(2) +
          '. Backup: "' + backup + '".';
+  Logger.log(msg);
+  return msg;
 }
