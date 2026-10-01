@@ -17,6 +17,11 @@ function ensureSchema_(){
   // Roster
   let ros = ss.getSheetByName(ROSTER_TAB);
   if (!ros){ ros = ss.insertSheet(ROSTER_TAB); ros.getRange(1, 1, 1, ROSTER_HEADERS.length).setValues([ROSTER_HEADERS]); }
+  else if (ros.getLastColumn() < ROSTER_HEADERS.length){
+    // Older Roster: add the Phone / PaysBy headers on the end. Data is untouched.
+    const have = ros.getLastColumn();
+    ros.getRange(1, have + 1, 1, ROSTER_HEADERS.length - have).setValues([ROSTER_HEADERS.slice(have)]);
+  }
 
   // Ledger (create fresh, or migrate existing)
   let led = ss.getSheetByName(LEDGER_TAB);
@@ -162,7 +167,9 @@ function getRoster_(){
       email: String(r[ROS.EMAIL - 1]).trim(),
       venmo: String(r[ROS.VENMO - 1]).trim().replace(/^@/, '').toLowerCase(),
       status: String(r[ROS.STATUS - 1]).trim() || 'Active',
-      notes: String(r[ROS.NOTES - 1]).trim()
+      notes: String(r[ROS.NOTES - 1]).trim(),
+      phone: String(r[ROS.PHONE - 1] == null ? '' : r[ROS.PHONE - 1]).trim(),
+      paysBy: String(r[ROS.PAYSBY - 1] == null ? '' : r[ROS.PAYSBY - 1]).trim()
     });
   });
   return out;

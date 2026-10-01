@@ -2,10 +2,19 @@
  *  ────────────────────────────────────────────────────────────────────────
  *  HOW IT FITS TOGETHER
  *    Dashboard ▸ 👥 Sign-ups ▸ Create sign-up form. That builds the Google
- *    Form (Full name, Email, Venmo handle), links it to this sheet and arms
- *    the auto-fill. Share the link it gives you — that's the whole intake.
- *    Each sign-up lands on the Roster and gets a welcome email with their pay
- *    code and a one-tap Venmo link.
+ *    Form (name, email, phone, how you'll pay, Venmo handle), links it to this
+ *    sheet and arms the auto-fill.
+ *
+ *    The class signs up on the HOME PAGE (the public site in Settings): an
+ *    "I'm new here" button whose form posts straight into that Google Form.
+ *    The dashboard gives you the home page link; it carries everything the
+ *    page needs (which form, which questions), so nothing is ever edited by
+ *    hand. Each sign-up lands on the Roster and gets a welcome email with
+ *    their pay code and a one-tap Venmo link.
+ *
+ *    SAFETY: a sign-up for an email already on the Roster never overwrites
+ *    that person's name or handle — it only fills blanks and re-sends their
+ *    welcome email (to that same address).
  *
  *  WHERE A RESPONSE GOES
  *    1. If the email already exists in Roster -> that row is updated (no dupes).
@@ -24,11 +33,13 @@ function onRecruitFormSubmit(e){
     }
     return '';
   };
-  const name  = pick(['Full name', 'Full Name', 'Name']);
-  const email = pick(['Email', 'Email Address', 'Email address']);
-  const venmo = pick(['Venmo handle', 'Venmo Handle', 'Venmo']).replace(/^@/, '');
+  const name   = pick(['Full name', 'Full Name', 'Name']);
+  const email  = pick(['Email', 'Email Address', 'Email address']);
+  const venmo  = pick(['Venmo handle', 'Venmo Handle', 'Venmo']).replace(/^@/, '');
+  const phone  = pick(['Phone', 'Phone number', 'Cell']);
+  const paysBy = pick(['How will you pay?', 'How will you pay', 'Pays by']);
   if (!name && !email) return;
-  const rid = upsertRoster_(name, email, venmo);
+  const rid = upsertRoster_(name, email, venmo, { phone: phone, paysBy: paysBy, fillOnly: true });
   if (rid && email) {
     try { sendWelcome_(rid, name, email); }
     catch (err){ Logger.log('Welcome email failed for ' + email + ': ' + err); }
@@ -71,15 +82,19 @@ function syncFormResponses(){
     const email = String(data[r][ciEmail] == null ? '' : data[r][ciEmail]).trim();
     const venmo = ciVenmo >= 0 ? String(data[r][ciVenmo] == null ? '' : data[r][ciVenmo]).trim().replace(/^@/, '') : '';
     if (!name && !email) continue;
-    upsertRoster_(name, email, venmo);
+    upsertRoster_(name, email, venmo, { fillOnly: true });
     n++;
   }
   return 'Synced ' + n + ' response(s) into Roster.';
 }
 
 /* Insert/update one recruit in Roster. Locked so simultaneous submissions
- * don't grab the same blank row. Returns the recruit's RecruitID. */
-function upsertRoster_(name, email, venmo){
+ * don't grab the same blank row. Returns the recruit's RecruitID.
+ * opts = { phone, paysBy, fillOnly }  fillOnly: an existing person's row only
+ * gets its BLANK cells filled (public sign-ups can't rename someone). */
+function upsertRoster_(name, email, venmo, opts){
+  opts = opts || {};
+  const phone = String(opts.phone || '').trim(), paysBy = String(opts.paysBy || '').trim();
   const lock = LockService.getScriptLock();
   try { lock.waitLock(15000); } catch (e){ return ''; }
   try {
@@ -104,13 +119,18 @@ function upsertRoster_(name, email, venmo){
     // 3) no room -> append a new row with the next unused RecruitID
     if (target === -1){
       const rid = nextRecruitId_(vals);
-      sh.appendRow([rid, name, email, venmo, 'Active', '']);
+      sh.appendRow([rid, name, email, venmo, 'Active', '', phone, paysBy]);
       return rid;
     }
 
-    sh.getRange(target, ROS.NAME).setValue(name);
-    sh.getRange(target, ROS.EMAIL).setValue(email);
-    if (venmo) sh.getRange(target, ROS.VENMO).setValue(venmo);
+    const cur = sh.getRange(target, 1, 1, ROSTER_HEADERS.length).getValues()[0];
+    const blank = col => String(cur[col - 1] == null ? '' : cur[col - 1]).trim() === '';
+    const put = (col, v) => { if (v && (!opts.fillOnly || blank(col))) sh.getRange(target, col).setValue(v); };
+    put(ROS.NAME, name);
+    put(ROS.EMAIL, email);
+    put(ROS.VENMO, venmo);
+    put(ROS.PHONE, phone);
+    put(ROS.PAYSBY, paysBy);
     if (String(sh.getRange(target, ROS.STATUS).getValue()).trim() === '')
       sh.getRange(target, ROS.STATUS).setValue('Active');
     return String(sh.getRange(target, ROS.RID).getValue()).trim();
@@ -167,8 +187,12 @@ function createSignupFormWeb(replace){
   form.addTextItem().setTitle('Full name').setHelpText('First and last, the way you\'d like it on the list.').setRequired(true);
   form.addTextItem().setTitle('Email').setRequired(true)
     .setValidation(FormApp.createTextValidation().requireTextIsEmail().build());
+  form.addTextItem().setTitle('Phone').setHelpText('Optional.');
+  form.addTextItem().setTitle('How will you pay?')
+    .setHelpText(getPaymentMethods_().map(m => m.name).join(', '));
   form.addTextItem().setTitle('Venmo handle')
     .setHelpText('Optional, e.g. @jane-doe. Helps match your payments automatically.');
+  try { form.setRequireLogin(false); } catch (e){}   // Workspace accounts default to sign-in only
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
 
   // Make sure submissions fill the Roster. (responsesTab_ finds the new
@@ -176,18 +200,82 @@ function createSignupFormWeb(replace){
   installFormTrigger();
 
   const url = form.getPublishedUrl();
-  return { ok: true, url: url,
-           msg: 'Sign-up form ready. Share the link — every sign-up lands on the Roster and gets their pay code by email.' };
+  return { ok: true, url: url, homeUrl: homeLink_(),
+           msg: 'Sign-up ready. Share the home page link — every sign-up lands on the Roster and gets their pay code by email.' };
+}
+
+
+/* ── The home page link ───────────────────────────────────────────────── */
+
+/* The public home page URL with this academy's sign-up details packed into
+ * ?kitty=… — which form to post to, its question IDs, the academy name and
+ * how to pay. The page remembers it, so the plain address works afterwards
+ * on that phone too. '' when there's no home page or no sign-up form yet. */
+function homeLink_(){
+  const cfg = homeConfig_();
+  if (!cfg || !VOTING_SITE_URL) return '';
+  const packed = Utilities.base64EncodeWebSafe(JSON.stringify(cfg), Utilities.Charset.UTF_8).replace(/=+$/, '');
+  return VOTING_SITE_URL + (VOTING_SITE_URL.indexOf('?') >= 0 ? '&' : '?') + 'kitty=' + packed;
+}
+
+function homeConfig_(){
+  let formUrl = '';
+  try { formUrl = ss_().getFormUrl() || ''; } catch (e){}
+  if (!formUrl || !isSetUp_()) return null;
+  const f = formEntries_(formUrl);
+  if (!f) return null;
+  return {
+    v: 1,
+    title: KITTY_TITLE,
+    post: f.post,
+    e: f.entries,                                        // {name, email, phone, paysBy, venmo} -> entry id
+    form: f.viewUrl,
+    venmo: COLLECTOR_VENMO,
+    dues: WEEKLY_DUES, weeks: SEASON_WEEKS,
+    methods: getPaymentMethods_().map(m => ({ n: m.name, to: m.sendTo, i: m.instructions }))
+  };
+}
+
+/* The form's public post URL and the entry.N id of each question, found by
+ * making a pre-filled link (the only reliable way to learn entry ids).
+ * Cached per form, since a form's questions never change. */
+const FORM_FIELDS = { name: 'Full name', email: 'Email', phone: 'Phone', paysBy: 'How will you pay?', venmo: 'Venmo handle' };
+function formEntries_(formUrl){
+  const props = PropertiesService.getScriptProperties();
+  const key = 'KITTY_FORM_ENTRIES';
+  try {
+    const hit = JSON.parse(props.getProperty(key) || 'null');
+    if (hit && hit.formUrl === formUrl) return hit;
+  } catch (e){}
+  let form;
+  try { form = FormApp.openByUrl(formUrl); } catch (e){ return null; }
+  const resp = form.createResponse();
+  const order = [];
+  form.getItems(FormApp.ItemType.TEXT).forEach(it => {
+    const field = Object.keys(FORM_FIELDS).filter(k => FORM_FIELDS[k].toLowerCase() === it.getTitle().trim().toLowerCase())[0];
+    if (!field) return;
+    resp.withItemResponse(it.asTextItem().createResponse('x'));
+    order.push(field);
+  });
+  if (!order.length) return null;
+  const ids = (resp.toPrefilledUrl().match(/entry\.\d+/g) || []);
+  const entries = {};
+  order.forEach((field, i) => { if (ids[i]) entries[field] = ids[i]; });
+  if (!entries.name || !entries.email) return null;     // not a kitty sign-up form
+  const viewUrl = form.getPublishedUrl();
+  const out = { formUrl: formUrl, viewUrl: viewUrl, post: viewUrl.replace(/\/viewform.*$/, '/formResponse'), entries: entries };
+  props.setProperty(key, JSON.stringify(out));
+  return out;
 }
 
 /* Add one person by hand (no form). Same rules as a form sign-up. */
-function addRecruitWeb(name, email, venmo, sendEmail){
+function addRecruitWeb(name, email, venmo, sendEmail, phone, paysBy){
   name = String(name || '').trim(); email = String(email || '').trim();
   venmo = String(venmo || '').trim().replace(/^@/, '');
   if (!name) return { ok: false, msg: 'Enter a name.' };
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, msg: 'That email doesn\'t look right.' };
   ensureSchema_();
-  const rid = upsertRoster_(name, email, venmo);
+  const rid = upsertRoster_(name, email, venmo, { phone: phone, paysBy: paysBy });
   if (!rid) return { ok: false, msg: 'Busy — try again.' };
   let sent = '';
   if (sendEmail && email){

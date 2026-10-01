@@ -70,7 +70,7 @@ function buildEmail_(r, week){
     'How to pay:\n' +
     methods.map(m => '  • ' + methodText(m)).join('\n') + '\n\n' +
     'You can also prepay the rest of the season ($' + TOTAL_PER_RECRUIT.toFixed(2) + ' total) and never hear from this reminder again.\n\n' +
-    (VOTING_SITE_URL ? 'Cast your snack vote here: ' + VOTING_SITE_URL + '\n\n' : '') +
+    (VOTING_SITE_URL ? 'Kitty home page + snack vote: ' + homeUrlSafe_() + '\n\n' : '') +
     '— ' + KITTY_TITLE;
 
   const html =
@@ -90,8 +90,8 @@ function buildEmail_(r, week){
       '<ul style="margin:0 0 12px;padding-left:20px">' + methods.map(methodHtml).join('') + '</ul>' +
       '<p style="margin:0 0 12px;color:#555">Prefer to be done? Prepay the rest of the season ($' +
         TOTAL_PER_RECRUIT.toFixed(2) + ' total) and these stop entirely.</p>' +
-      (VOTING_SITE_URL ? '<p style="margin:14px 0 0;font-size:13px;color:#888">Cast your snack vote here: ' +
-        '<a href="' + esc_(VOTING_SITE_URL) + '" style="color:#C8102E">' + esc_(VOTING_SITE_URL) + '</a></p>' : '') +
+      (VOTING_SITE_URL ? '<p style="margin:14px 0 0;font-size:13px;color:#888">' +
+        '<a href="' + esc_(homeUrlSafe_()) + '" style="color:#C8102E">Kitty home page + snack vote</a></p>' : '') +
       '<p style="margin:4px 0 0;font-size:13px;color:#888">— ' + esc_(KITTY_TITLE) + '</p>' +
     '</div>';
 
@@ -100,4 +100,9 @@ function buildEmail_(r, week){
 
 function esc_(s){
   return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+
+/* Home page link for emails: the sign-up-aware one when there's a form. */
+function homeUrlSafe_(){
+  try { return homeLink_() || VOTING_SITE_URL; } catch (e){ return VOTING_SITE_URL; }
 }

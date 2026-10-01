@@ -21,7 +21,7 @@ const SETTING_DEFS = [
   ['seasonStart',   'Week 1 starts',           '',        'The date week 1 begins (yyyy-mm-dd).'],
   ['seasonWeeks',   'Number of weeks',         15,        'How many weeks of dues.'],
   ['weeklyDues',    'Weekly dues ($)',         20,        'Dollars per recruit per week.'],
-  ['votingSiteUrl', 'Snack voting site (optional)', 'https://forgedreams-ai.github.io/firehouse-snack-vote/', 'Linked in reminder emails. Leave blank to hide.']
+  ['votingSiteUrl', 'Home page site', 'https://forgedreams-ai.github.io/firehouse-snack-vote/', 'The public site with the "I\'m new here" sign-up and the snack vote. Leave blank to hide.']
 ];
 
 /* Read the Settings tab (falls back to defaults for anything blank/missing).
@@ -96,8 +96,8 @@ const LEDGER_TAB   = 'Ledger';
 const EXPENSES_TAB = 'Expenses';
 
 /* Column positions (1-based) and headers. */
-const ROS = { RID: 1, NAME: 2, EMAIL: 3, VENMO: 4, STATUS: 5, NOTES: 6 };
-const ROSTER_HEADERS = ['RecruitID', 'FullName', 'Email', 'VenmoHandle', 'Status', 'Notes'];
+const ROS = { RID: 1, NAME: 2, EMAIL: 3, VENMO: 4, STATUS: 5, NOTES: 6, PHONE: 7, PAYSBY: 8 };
+const ROSTER_HEADERS = ['RecruitID', 'FullName', 'Email', 'VenmoHandle', 'Status', 'Notes', 'Phone', 'PaysBy'];
 
 const LED = { TS: 1, RID: 2, NAME: 3, METHOD: 4, AMOUNT: 5, WEEK: 6,
               PAYER: 7, SOURCE: 8, SPLIT: 9, REVIEW: 10, MEMO: 11 };

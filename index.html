@@ -128,6 +128,28 @@ body{
   box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
 .hide{display:none;}
+
+/* ---- home + kitty sign-up ---- */
+@media (max-width:520px){ .tab{padding:11px 2px;font-size:12px;letter-spacing:.5px;} }
+.hero{background:var(--char2);border:2px solid var(--line);border-radius:var(--radius);padding:20px 18px;margin:14px 0;}
+.hero h2{font-family:'Oswald';font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:1px;line-height:1.05;}
+.hero p{color:#c4c9d1;font-size:14px;line-height:1.5;margin-top:8px;}
+.bigbtn{display:block;width:100%;font-family:'Oswald';font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  font-size:18px;padding:17px 18px;margin-top:12px;border-radius:12px;cursor:pointer;text-align:center;
+  background:var(--red);color:#fff;border:2px solid var(--amber);}
+.bigbtn.alt{background:var(--char);color:var(--cream);border-color:var(--line);font-size:15px;padding:14px;}
+.bigbtn:disabled{opacity:.5;cursor:wait;}
+.hfield{margin-top:14px;}
+.hfield .help{font-size:12px;color:var(--mut);margin-top:5px;line-height:1.4;}
+.hfield .bad{border-color:var(--red);}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{font-size:14px;padding:10px 15px;border-radius:30px;background:var(--char);border:2px solid var(--line);color:#c4c9d1;cursor:pointer;}
+.chip.on{border-color:var(--amber);color:var(--cream);background:#2a2410;}
+.payrow{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.4;}
+.payrow:first-child{border-top:none;}
+.payrow b{min-width:74px;font-family:'Oswald';letter-spacing:.5px;}
+.codebox{font-family:'Oswald';font-size:15px;color:var(--amber);}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;}
 /* ---- budget ---- */
 .bgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin:16px 0 6px;}
 .bfield{display:flex;flex-direction:column;gap:5px;font-size:11px;text-transform:uppercase;letter-spacing:1px;
@@ -207,12 +229,14 @@ body{
 <div class="wrap">
   <div id="banner"></div>
   <div class="tabs">
-    <button id="tab-vote" class="tab on" type="button">Vote</button>
+    <button id="tab-home" class="tab on" type="button">Home</button>
+    <button id="tab-vote" class="tab" type="button">Vote</button>
     <button id="tab-results" class="tab" type="button">Results</button>
     <button id="tab-budget" class="tab" type="button">Budget</button>
     <button id="tab-receipts" class="tab" type="button">Receipts</button>
   </div>
-  <div id="vote-view"></div>
+  <div id="home-view"></div>
+  <div id="vote-view" class="hide"></div>
   <div id="results-view" class="hide"></div>
   <div id="budget-view" class="hide"></div>
   <div id="receipts-view" class="hide"></div>
@@ -431,14 +455,16 @@ function loadPurchases(){
    VIEW SWITCHING
    ============================================================================ */
 function setView(v){
-  ['vote','results','budget','receipts'].forEach(name => {
+  ['home','vote','results','budget','receipts'].forEach(name => {
     document.getElementById('tab-' + name).className = 'tab' + (v === name ? ' on' : '');
     document.getElementById(name + '-view').className = (v === name ? '' : 'hide');
   });
   if (v === 'results') loadResults();
   if (v === 'budget') loadBudget();
   if (v === 'receipts') initReceipts();
+  if (v === 'home') renderHome();
 }
+document.getElementById('tab-home').addEventListener('click', () => { homeMode = 'home'; setView('home'); });
 document.getElementById('tab-vote').addEventListener('click', () => setView('vote'));
 document.getElementById('tab-results').addEventListener('click', () => setView('results'));
 document.getElementById('tab-budget').addEventListener('click', () => setView('budget'));
@@ -1469,6 +1495,161 @@ function showToast(msg){
 }
 
 /* ============================================================================
+   HOME + KITTY SIGN-UP
+   The kitty manager shares this page as  …/?kitty=<packed details>  (the
+   dashboard's "Copy home page link"). Those details say which Google Form to
+   post the sign-up into and how to pay; the page remembers them on this phone.
+   The sign-up goes straight into the kitty's Google Form, which puts the
+   person on the Roster and emails them their pay code. Nothing to configure
+   here. We never ask for card or bank numbers — only HOW they'll pay.
+   ============================================================================ */
+let KITTY = null;          // decoded sign-up details, or null
+let homeMode = 'home';     // 'home' | 'signup' | 'done'
+let suForm = { name:'', email:'', phone:'', paysBy:'', venmo:'' };
+let suSending = false;
+
+function store(k, v){ try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function recall(k){ try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch(e){ return null; } }
+
+function loadKitty(){
+  try {
+    const raw = new URLSearchParams(location.search).get('kitty');
+    if (raw){
+      const b64 = raw.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((raw.length + 3) % 4);
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      const cfg = JSON.parse(new TextDecoder().decode(bytes));
+      if (cfg && cfg.post && cfg.e && cfg.e.name && cfg.e.email){ store('kittyCfg', cfg); return cfg; }
+    }
+  } catch(e){ /* bad link — fall back to what this phone remembers */ }
+  const saved = recall('kittyCfg');
+  return (saved && saved.post && saved.e) ? saved : null;
+}
+
+function renderHome(){
+  const el = document.getElementById('home-view');
+  if (homeMode === 'signup' && KITTY) return renderSignup(el);
+  if (homeMode === 'done' && KITTY)   return renderSignupDone(el);
+  const me = recall('kittyMe');
+  let h = '';
+  if (KITTY){
+    h += `<div class="hero"><div class="kicker" style="color:var(--amber)">Academy kitty</div>
+      <h2>${esc(KITTY.title || 'The Kitty')}</h2>
+      <p>The kitty keeps the crew in snacks. Dues are <b>$${Number(KITTY.dues||0).toFixed(2)} a week</b>${KITTY.weeks ? ' for ' + KITTY.weeks + ' weeks' : ''}.</p>
+      ${me ? `<div class="msg" style="background:#103a22;border:2px solid #1d6e40;color:#c8f5d8;margin-bottom:0">✓ Signed up as <b>${esc(me.name)}</b>. Your pay code is in the welcome email sent to ${esc(me.email)}.</div>` : ''}
+      <button class="bigbtn" id="h-new" type="button">👋 I'm new here — sign up</button>
+      <button class="bigbtn alt" id="h-vote" type="button">🗳 Vote on this week's snacks</button></div>`;
+    h += `<div class="hero"><div class="lbl">How to pay</div>${payRows()}
+      <p class="note">Put <span class="codebox">Kitty</span> + <span class="codebox">your pay code</span> (like <span class="codebox">Kitty R012</span>) in the Venmo note so it's credited to you automatically — even from someone else's account. Your code is in your welcome email.</p></div>`;
+  } else {
+    h += `<div class="hero"><h2>Welcome, crew</h2>
+      <p>Vote on what goes in the snack run, see live results, and plan the budget.</p>
+      <button class="bigbtn" id="h-vote" type="button">🗳 Vote on this week's snacks</button>
+      <p class="note">New to the academy kitty? Open the sign-up link your kitty manager shared — it brings you back here with a <b>Sign up</b> button.</p></div>`;
+  }
+  el.innerHTML = h;
+  const nb = document.getElementById('h-new'); if (nb) nb.addEventListener('click', () => { homeMode = 'signup'; renderHome(); window.scrollTo(0, 0); });
+  document.getElementById('h-vote').addEventListener('click', () => setView('vote'));
+}
+
+function payRows(){
+  return (KITTY.methods || []).map(m => {
+    const to = m.n === 'Venmo' ? (m.to || KITTY.venmo) : m.to;
+    return `<div class="payrow"><b>${esc(m.n)}</b><span>${to ? 'Send to <b style="min-width:0;font-family:inherit">' + esc(to) + '</b>' : ''}${to && m.i ? ' — ' : ''}${esc(m.i || '')}</span></div>`;
+  }).join('');
+}
+
+function renderSignup(el){
+  const methods = (KITTY.methods || []).map(m => m.n);
+  if (!suForm.paysBy && methods.length) suForm.paysBy = methods[0];
+  el.innerHTML = `<div class="hero"><div class="kicker" style="color:var(--amber)">${esc(KITTY.title || 'Kitty')}</div>
+    <h2>Sign up</h2>
+    <p>30 seconds. You'll get an email with your pay code and a one-tap Venmo button.</p>
+    <div class="hfield"><div class="lbl">Full name</div><input class="name" id="su-name" autocomplete="name" placeholder="First and last" value="${esc(suForm.name)}"></div>
+    <div class="hfield"><div class="lbl">Email</div><input class="name" id="su-email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" value="${esc(suForm.email)}">
+      <div class="help">Your pay code and reminders go here.</div></div>
+    <div class="hfield"><div class="lbl">Phone <span style="text-transform:none;letter-spacing:0">(optional)</span></div><input class="name" id="su-phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="602-555-0100" value="${esc(suForm.phone)}"></div>
+    <div class="hfield"><div class="lbl">How will you pay?</div><div class="chips" id="su-pays">${methods.map(n =>
+      `<button type="button" class="chip${suForm.paysBy === n ? ' on' : ''}" data-m="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+      <div class="help">No card or bank numbers — just which way you'll send it.</div></div>
+    <div class="hfield${suForm.paysBy === 'Venmo' ? '' : ' hide'}" id="su-venmo-wrap"><div class="lbl">Your Venmo handle <span style="text-transform:none;letter-spacing:0">(optional)</span></div>
+      <input class="name" id="su-venmo" autocomplete="off" autocapitalize="off" placeholder="@your-handle" value="${esc(suForm.venmo)}">
+      <div class="help">Helps match your payments automatically.</div></div>
+    <input class="hp" id="su-website" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <div id="su-err"></div>
+    <button class="bigbtn" id="su-go" type="button"${suSending ? ' disabled' : ''}>${suSending ? 'Signing you up…' : 'Sign me up'}</button>
+    <button class="bigbtn alt" id="su-back" type="button">Back</button></div>`;
+  const keep = () => {
+    suForm.name = document.getElementById('su-name').value;
+    suForm.email = document.getElementById('su-email').value;
+    suForm.phone = document.getElementById('su-phone').value;
+    suForm.venmo = document.getElementById('su-venmo').value;
+  };
+  el.querySelectorAll('#su-pays .chip').forEach(b => b.addEventListener('click', () => {
+    keep(); suForm.paysBy = b.getAttribute('data-m'); renderHome();
+  }));
+  document.getElementById('su-back').addEventListener('click', () => { keep(); homeMode = 'home'; renderHome(); });
+  document.getElementById('su-go').addEventListener('click', () => { keep(); submitSignup(); });
+}
+
+async function submitSignup(){
+  if (suSending) return;
+  const f = {
+    name: suForm.name.trim().replace(/\s+/g, ' '),
+    email: suForm.email.trim(),
+    phone: suForm.phone.trim(),
+    paysBy: suForm.paysBy,
+    venmo: suForm.paysBy === 'Venmo' ? suForm.venmo.trim().replace(/^@?/, suForm.venmo.trim() ? '@' : '') : ''
+  };
+  const errs = [];
+  if (f.name.split(' ').length < 2) errs.push('Enter your first and last name.');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) errs.push('Enter a valid email — your pay code is sent there.');
+  if (f.phone && f.phone.replace(/\D/g, '').length < 10) errs.push('Phone looks short — or leave it blank.');
+  if (errs.length){
+    document.getElementById('su-err').innerHTML = `<div class="msg err">${errs.map(esc).join('<br>')}</div>`;
+    return;
+  }
+  if (document.getElementById('su-website').value){ homeMode = 'done'; renderHome(); return; }   // bot
+
+  const body = new URLSearchParams();
+  const e = KITTY.e;
+  body.append(e.name, f.name);
+  body.append(e.email, f.email);
+  if (e.phone)  body.append(e.phone, f.phone);
+  if (e.paysBy) body.append(e.paysBy, f.paysBy);
+  if (e.venmo)  body.append(e.venmo, f.venmo);
+
+  suSending = true; renderHome();
+  try {
+    // Google Forms doesn't send CORS headers, so the response can't be read —
+    // a network error is the only failure we can see.
+    await fetch(KITTY.post, { method: 'POST', mode: 'no-cors', body: body });
+    store('kittyMe', { name: f.name, email: f.email });
+    homeMode = 'done';
+  } catch (err){
+    suSending = false; renderHome();
+    document.getElementById('su-err').innerHTML =
+      `<div class="msg err">Couldn't reach Google — check your signal and try again${KITTY.form ? `, or <a class="link" href="${esc(KITTY.form)}" target="_blank" rel="noopener">use the Google Form</a>` : ''}.</div>`;
+    return;
+  }
+  suSending = false;
+  renderHome();
+  window.scrollTo(0, 0);
+}
+
+function renderSignupDone(el){
+  const me = recall('kittyMe') || { name: suForm.name, email: suForm.email };
+  const first = String(me.name || '').split(' ')[0];
+  el.innerHTML = `<div class="hero" style="text-align:center">
+    <div style="font-size:44px">🔥</div>
+    <h2>You're in${first ? ', ' + esc(first) : ''}!</h2>
+    <p>Check <b>${esc(me.email)}</b> for your <b>pay code</b> and a one-tap Venmo button. It usually lands within a few minutes — check spam if you don't see it.</p>
+    <p class="note">No email after 10 minutes?${KITTY.form ? ` <a class="link" href="${esc(KITTY.form)}" target="_blank" rel="noopener">Sign up with the Google Form</a> or` : ''} tell the kitty manager.</p>
+    <button class="bigbtn alt" id="su-home" type="button">Back to home</button></div>
+    <div class="hero"><div class="lbl">How to pay</div>${payRows()}</div>`;
+  document.getElementById('su-home').addEventListener('click', () => { homeMode = 'home'; suForm = { name:'', email:'', phone:'', paysBy:'', venmo:'' }; renderHome(); });
+}
+
+/* ============================================================================
    BOOT
    ============================================================================ */
 (function boot(){
@@ -1481,6 +1662,8 @@ function showToast(msg){
       `<div class="msg warn"><b>Setup not finished.</b> Still need: ${missing.join(', ')}. Paste them into the CONFIG block at the top of index.html, then re-upload. See README.md.</div>`;
   }
   initVote();
+  KITTY = loadKitty();
+  renderHome();
 })();
 </script>
 </body>

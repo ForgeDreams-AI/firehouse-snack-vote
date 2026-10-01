@@ -79,6 +79,7 @@ function setupInfo_(){
     values: values,
     defs: SETTING_DEFS.map(d => ({ key: d[0], label: d[1], help: d[3] })),
     formUrl: formUrl.replace(/\/edit.*$/, '/viewform'),
+    homeUrl: (function(){ try { return homeLink_(); } catch (e){ return ''; } })(),
     sheetUrl: ss.getUrl(),
     runningAs: (function(){ try { return Session.getEffectiveUser().getEmail(); } catch (e){ return ''; } })()
   };

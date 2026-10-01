@@ -11,6 +11,7 @@ No server to run, no account for voters.
 
 | Tab in the app | What it does |
 |----------------|--------------|
+| **Home**       | Front door. With the kitty's home page link (from the kitty dashboard ▸ 👥 Sign-ups) it shows **👋 I'm new here — sign up** (name, email, phone, how they'll pay) and how to pay. Sign-ups go into the kitty's Google Form → Roster → welcome email with their pay code. Nothing to configure here. |
 | **Vote**       | The ballot. Pick up to 3 per section. Badges: 🟢 pocket-proof, 🫠 melts, 🛒 bought last week. |
 | **Results**    | Live tally + write-in buzz. |
 | **Budget**     | Top-3-per-section shopping planner against a weekly budget. |

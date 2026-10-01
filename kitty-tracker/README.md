@@ -18,10 +18,11 @@ Everything happens from the **🔥 Kitty** menu in the Google Sheet.
 3. The Settings screen opens. Fill in the academy name, your name, your Venmo
    handle and the week 1 start date, then **Save & turn on**. Google asks you to
    allow access once.
-4. On the dashboard tap **👥 Sign-ups ▸ Create sign-up form**, then paste the link
-   in the group chat. Every sign-up lands on the Roster with a pay code
-   (R001, R002…) and gets a welcome email with their code and a one-tap Venmo
-   link. Anyone who doesn't use the form can be added there by hand.
+4. On the dashboard tap **👥 Sign-ups ▸ Create sign-up**, then **Copy home page
+   link** and paste it in the group chat. New people tap **👋 I'm new here**,
+   enter name, email, phone and how they'll pay (never card numbers), and land
+   on the Roster with a pay code (R001, R002…) emailed to them with a one-tap
+   Venmo button. Anyone who skips it can be added by hand in the same panel.
 
 That's it. Venmo receipts are read from **your** Gmail, so recruits must pay
 the Venmo account that emails you. Reminders go out on their own, the season
@@ -129,7 +130,7 @@ Every one backs the Ledger up to a timestamped tab first and is safe to re-run.
 | `WebApp.gs` + `dashboard.html` | The dashboard. |
 | `Reminders.gs` | Weekly reminder emails. |
 | `Expenses.gs` + `ReceiptReport.gs` | Receipt scanning and spend reports. |
-| `FormIntake.gs` | Builds the sign-up Form, fills the Roster, sends welcome emails. |
+| `FormIntake.gs` | Builds the sign-up Form + home page link, fills the Roster, sends welcome emails. |
 | `Admin.gs` | The 🔥 Kitty menu, settings, new academy, triggers and repair tools. |
 
 Tabs: **Settings** · **Roster** · **Ledger** · **Payments** · **Aliases** · **PaymentMethods** · **Expenses** (plus `Ledger_bak_*` safety copies).
