@@ -16,12 +16,15 @@
  *  a red bar instead of quietly showing wrong numbers. That single check would
  *  have caught every bug this tracker has ever had.
  *
- *  ALLOCATION: who a payment is FOR is read from the note, which is clean data
- *  in a downloaded statement (unlike a scraped email). Rules, in order:
- *    1. Note names roster people (or their Aliases) -> split equally among them.
+ *  ALLOCATION: who a payment is FOR. Rules, in order:
+ *    1. Pay codes in the note ("Kitty R012 R015") -> split equally among them.
+ *       Codes are exact, so they win over everything — including the sender,
+ *       which is what makes a payment from a parent's account land correctly.
+ *    2. (Statement import only — its notes are clean data, unlike a scraped
+ *       email.) Note names roster people or their Aliases -> split equally.
  *       "me"/"myself"/"and I" also includes the sender.
- *    2. Otherwise -> the whole payment goes to the sender.
- *    3. Sender unknown, or the split doesn't divide evenly -> review queue.
+ *    3. Otherwise -> the whole payment goes to the sender.
+ *    4. Sender unknown, or the split doesn't divide evenly -> review queue.
  *  The collector is never a valid target — see Venmo.gs.                     */
 
 
@@ -96,29 +99,53 @@ function checkTheBooks(){
 
 /* ── Allocation ───────────────────────────────────────────────────────────*/
 
+/* Roster people whose pay code (RecruitID) appears as a whole word in text. */
+function codesInText_(text, roster){
+  const tokens = String(text || '').toUpperCase().match(/[A-Z0-9]+/g) || [];
+  const collector = normName_(COLLECTOR_NAME);
+  const out = [];
+  roster.forEach(r => {
+    const code = payCode_(r.rid);
+    // Only code-shaped IDs (letters + digits) — never match an ordinary word.
+    if (code.length < 3 || !/\d/.test(code)) return;
+    if (normName_(r.name) === collector) return;
+    if (tokens.indexOf(code) >= 0 && out.indexOf(r) < 0) out.push(r);
+  });
+  return out;
+}
+
 /* Who is this payment for? Returns an array of { rid, name, amount }, or []
- * when it can't be resolved confidently (-> review queue). */
-function allocatePayment_(payment, roster, aliases){
+ * when it can't be resolved confidently (-> review queue).
+ *   payment = { payer, amount, note, codeText? }  codeText = extra text to
+ *             search for pay codes (the email line containing "Kitty").
+ *   opts.names = false skips name/alias matching (the email poller, whose
+ *             scraped notes are too unreliable to credit on names). */
+function allocatePayment_(payment, roster, aliases, opts){
+  opts = opts || {};
   const collector = normName_(COLLECTOR_NAME);
   const note = ' ' + normName_(payment.note) + ' ';
   const amount = payment.amount;
 
-  // Who does the note name? Full roster names first, then aliases.
   const named = [];
   const add = r => { if (r && normName_(r.name) !== collector && named.indexOf(r) < 0) named.push(r); };
 
-  roster.forEach(r => {
+  // 1. Pay codes — exact, so when present they're the whole answer.
+  codesInText_(payment.note + ' ' + (payment.codeText || ''), roster).forEach(add);
+  const byCode = named.length > 0;
+
+  // 2. Names in the note: full roster names first, then aliases.
+  if (!byCode && opts.names !== false) roster.forEach(r => {
     const n = normName_(r.name);
     if (n.length >= 5 && note.indexOf(' ' + n + ' ') >= 0) add(r);
   });
-  Object.keys(aliases).forEach(nick => {
+  if (!byCode && opts.names !== false) Object.keys(aliases || {}).forEach(nick => {
     if (note.indexOf(' ' + nick + ' ') >= 0){
       const full = normName_(aliases[nick]);
       add(roster.filter(r => normName_(r.name) === full)[0]);
     }
   });
   // Distinct roster surnames/first names mentioned on their own (e.g. "Carson").
-  roster.forEach(r => {
+  if (!byCode && opts.names !== false) roster.forEach(r => {
     const parts = normName_(r.name).split(' ');
     parts.forEach(tok => {
       if (tok.length < 4) return;
@@ -130,7 +157,7 @@ function allocatePayment_(payment, roster, aliases){
   const sender = matchSender_({ payer: payment.payer, amount: amount, handle: '', memo: '' }, roster);
 
   // "me" / "myself" / "and I" -> the sender is one of the people covered.
-  if (named.length && /\b(me|myself|and i)\b/.test(note) && sender && named.indexOf(sender) < 0){
+  if (named.length && !byCode && /\b(me|myself|and i)\b/.test(note) && sender && named.indexOf(sender) < 0){
     named.unshift(sender);
   }
 
@@ -147,4 +174,30 @@ function allocatePayment_(payment, roster, aliases){
     return [{ rid: sender.rid, name: sender.name, amount: amount }];
   }
   return [];
+}
+
+
+/* ── Recording ────────────────────────────────────────────────────────────*/
+
+/* Record one payment that arrived. Skips an ID that's already recorded. */
+function appendPaymentRecord_(id, stamp, method, payer, amount, note, allocText){
+  const sh = sheet_(PAYMENTS_TAB);
+  if (!sh) return;
+  if (getPayments_().some(p => p.id === String(id))) return;
+  const row = [];
+  row[PAY.ID - 1]     = String(id);
+  row[PAY.DATE - 1]   = stamp;
+  row[PAY.METHOD - 1] = method;
+  row[PAY.PAYER - 1]  = payer;
+  row[PAY.AMOUNT - 1] = amount;
+  row[PAY.NOTE - 1]   = note || '';
+  row[PAY.ALLOC - 1]  = allocText;
+  sh.appendRow(row);
+}
+
+/* Keep the Payments tab's "Allocated" column in step with a human decision. */
+function setPaymentAlloc_(id, allocText){
+  if (!id) return;
+  const p = getPayments_().filter(x => x.id === String(id))[0];
+  if (p) sheet_(PAYMENTS_TAB).getRange(p.row, PAY.ALLOC).setValue(allocText);
 }

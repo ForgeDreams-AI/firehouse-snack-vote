@@ -37,22 +37,39 @@ function sendOne_(r, week){
   Logger.log('Sent week ' + week + ' reminder to ' + r.name + ' <' + r.email + '> at ' + nowStamp_());
 }
 
-/* Email template — HTML + plain text. */
+/* Email template — HTML + plain text.
+ * The Venmo button opens the app with the amount AND the note ("Kitty R012")
+ * already filled in, so the tracker credits it even from someone else's
+ * account. Every method on the PaymentMethods tab is listed. */
 function buildEmail_(r, week){
   const first = (r.name || 'Recruit').split(/\s+/)[0];
   const owed = r.owed.toFixed(2);
   const weeksBehind = Math.max(1, Math.ceil(r.owed / WEEKLY_DUES));
   const subject = 'PHX FD Kitty — Week ' + week + ' dues ($' + owed + ' to get current)';
+  const code = payCode_(r.rid), note = payNote_([r.rid]);
+  const link = venmoPayLink_([r.rid], r.owed);
+  const methods = getPaymentMethods_();
+
+  const methodText = m => m.name === 'Venmo'
+    ? 'Venmo — tap: ' + link + '\n      (or send to ' + (m.sendTo || COLLECTOR_VENMO) + ' with the note: ' + note + ')'
+    : m.name + (m.sendTo ? ' — ' + m.sendTo : '') + (m.instructions ? ' — ' + m.instructions : '');
+  const methodHtml = m => m.name === 'Venmo'
+    ? '<li>Venmo — use the button above, or send to <b>' + esc_(m.sendTo || COLLECTOR_VENMO) +
+        '</b> with the note <b>' + esc_(note) + '</b>.</li>'
+    : '<li>' + esc_(m.name) + (m.sendTo ? ' — <b>' + esc_(m.sendTo) + '</b>' : '') +
+        (m.instructions ? ' — ' + esc_(m.instructions) : '') + '</li>';
 
   const text =
     'Hey ' + first + ',\n\n' +
     'Quick reminder on the academy snack kitty. We\'re on week ' + week + ' of ' + SEASON_WEEKS + '.\n' +
     'You\'re behind by ' + weeksBehind + ' week' + (weeksBehind === 1 ? '' : 's') + ' — $' + owed + ' gets you current.\n\n' +
+    'Your pay code is ' + code + '. Put "' + note + '" in the Venmo note and it\'s credited to you\n' +
+    'automatically, even if you pay from someone else\'s account.\n' +
+    'Paying for friends too? Add their codes: "' + PAY_NOTE_PREFIX + ' ' + code + ' R0xx R0yy".\n\n' +
     'How to pay:\n' +
-    '  • Cash — hand it to the academy kitty lead.\n' +
-    '  • Venmo — send to ' + VENMO_HANDLE + ' on Venmo (note your full name).\n\n' +
+    methods.map(m => '  • ' + methodText(m)).join('\n') + '\n\n' +
     'You can also prepay the rest of the season ($' + TOTAL_PER_RECRUIT.toFixed(2) + ' total) and never hear from this reminder again.\n\n' +
-    'Cast your snack vote here: ' + VOTING_SITE_URL + '\n\n' +
+    (VOTING_SITE_URL ? 'Cast your snack vote here: ' + VOTING_SITE_URL + '\n\n' : '') +
     '— PHX FD Academy Kitty';
 
   const html =
@@ -61,17 +78,19 @@ function buildEmail_(r, week){
       '<p style="margin:0 0 12px">Quick reminder on the academy snack kitty — we\'re on <b>week ' + week + ' of ' + SEASON_WEEKS + '</b>.</p>' +
       '<p style="margin:0 0 12px">You\'re behind by <b>' + weeksBehind + ' week' + (weeksBehind === 1 ? '' : 's') + '</b>. ' +
         '<b>$' + owed + '</b> gets you current.</p>' +
-      '<table cellpadding="0" cellspacing="0" style="margin:0 0 12px"><tr><td style="background:#C8102E;color:#fff;' +
-        'font-weight:bold;padding:10px 16px;border-radius:8px">$' + owed + ' to catch up</td></tr></table>' +
-      '<p style="margin:0 0 6px"><b>How to pay</b></p>' +
-      '<ul style="margin:0 0 12px;padding-left:20px">' +
-        '<li>Cash — hand it to the academy kitty lead.</li>' +
-        '<li>Venmo — send to <b>' + esc_(VENMO_HANDLE) + '</b> on Venmo (put your full name in the note).</li>' +
-      '</ul>' +
+      '<table cellpadding="0" cellspacing="0" style="margin:0 0 8px"><tr><td style="background:#C8102E;border-radius:8px">' +
+        '<a href="' + esc_(link) + '" style="display:inline-block;color:#fff;font-weight:bold;padding:11px 18px;text-decoration:none">' +
+        'Pay $' + owed + ' on Venmo</a></td></tr></table>' +
+      '<p style="margin:0 0 12px;font-size:13px;color:#555">Opens Venmo with the amount and note filled in. ' +
+        'Keep the note <b>' + esc_(note) + '</b> — that\'s what credits it to you, even from someone else\'s account.</p>' +
+      '<p style="margin:0 0 12px;font-size:13px;color:#555">Your pay code: <b style="color:#15171B">' + esc_(code) + '</b>. ' +
+        'Covering friends too? Add their codes to the note: <b>' + esc_(PAY_NOTE_PREFIX + ' ' + code) + ' R0xx R0yy</b>.</p>' +
+      '<p style="margin:0 0 6px"><b>Other ways to pay</b></p>' +
+      '<ul style="margin:0 0 12px;padding-left:20px">' + methods.map(methodHtml).join('') + '</ul>' +
       '<p style="margin:0 0 12px;color:#555">Prefer to be done? Prepay the rest of the season ($' +
         TOTAL_PER_RECRUIT.toFixed(2) + ' total) and these stop entirely.</p>' +
-      '<p style="margin:14px 0 0;font-size:13px;color:#888">Cast your snack vote here: ' +
-        '<a href="' + esc_(VOTING_SITE_URL) + '" style="color:#C8102E">' + esc_(VOTING_SITE_URL) + '</a></p>' +
+      (VOTING_SITE_URL ? '<p style="margin:14px 0 0;font-size:13px;color:#888">Cast your snack vote here: ' +
+        '<a href="' + esc_(VOTING_SITE_URL) + '" style="color:#C8102E">' + esc_(VOTING_SITE_URL) + '</a></p>' : '') +
       '<p style="margin:4px 0 0;font-size:13px;color:#888">— PHX FD Academy Kitty</p>' +
     '</div>';
 

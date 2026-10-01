@@ -84,9 +84,32 @@ const DEFAULT_ALIASES = [
   ['jake',  'Jacob Fretto']
 ];
 
-/* Ledger "Payment Status" wording. Reads also understand legacy true/false. */
-const REVIEW_GOOD = 'Payment Good!';
-const REVIEW_BAD  = 'Payment Bad!';
+/* Ledger "Payment Status" wording. Reads also understand legacy true/false.
+ *   REVIEW_HAND      — a person decided this (assign, split, hand entry). The
+ *                      automation never moves these rows again.
+ *   REVIEW_DISMISSED — "not dues". The row stays (so the poller can't re-add the
+ *                      payment) but credits nobody. */
+const REVIEW_GOOD      = 'Payment Good!';
+const REVIEW_BAD       = 'Payment Bad!';
+const REVIEW_HAND      = 'Payment Good! (by hand)';
+const REVIEW_DISMISSED = 'Dismissed';
+
+/* Pay codes. Every recruit's code is their RecruitID (R012). A Venmo note of
+ * "Kitty R012" credits R012 no matter whose account it came from; "Kitty R012
+ * R015" splits it between them. Reminder emails carry a pay link with the
+ * note pre-filled, so nobody has to remember the format. */
+const PAY_NOTE_PREFIX = 'Kitty';
+
+/* PaymentMethods tab — the ways recruits can pay. The kitty manager edits this
+ * from the dashboard (⚙ Payment methods). Venmo and Cash are always present;
+ * Venmo is the only one recorded automatically, the rest are logged by hand. */
+const METHODS_TAB = 'PaymentMethods';
+const METHODS_HEADERS = ['Method', 'SendTo', 'Instructions'];
+const BUILTIN_METHODS = ['Venmo', 'Cash'];
+const DEFAULT_METHODS = [
+  ['Venmo', COLLECTOR_VENMO, 'Use the pay link in your reminder. Keep the note as-is.'],
+  ['Cash',  '',              'Hand it to the kitty manager.']
+];
 
 /* Gmail / parsing. */
 const VENMO_SENDER      = 'venmo@venmo.com';

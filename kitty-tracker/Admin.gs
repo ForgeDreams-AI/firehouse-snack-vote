@@ -88,6 +88,10 @@ function listTriggers(){
  *  Aliases, falling back to the sender. Anything it can't resolve confidently
  *  goes to the review queue rather than being guessed at.
  *
+ *  HUMAN DECISIONS SURVIVE. A payment you assigned, split or dismissed on the
+ *  dashboard is matched back up (same payer + amount, same day ±1) and keeps
+ *  your decision instead of being re-guessed.
+ *
  *  CASH IS NEVER TOUCHED. Finishes by reconciling the two tables. */
 function importVenmoStatement(){
   ensureSchema_();
@@ -97,6 +101,10 @@ function importVenmoStatement(){
 
   const rows = tab.getDataRange().getValues();
   if (rows.length < 2) return logAndReturn_('The StatementImport tab is empty.');
+
+  // Running totals start from cash, so week labels line up with the dashboard.
+  const covered = {};
+  getLedger_().forEach(e => { if (e.method !== 'Venmo' && credits_(e)) covered[e.rid] = (covered[e.rid] || 0) + e.amount; });
 
   // Find the header row wherever Venmo put it.
   let hdr = -1, col = {};
@@ -117,6 +125,9 @@ function importVenmoStatement(){
   const led = sheet_(LEDGER_TAB);
   led.copyTo(ss).setName(backup);
 
+  // Remember every human decision before clearing, keyed by fingerprint.
+  const kept = keptDecisions_();
+
   // Clear ALL Venmo — both tables. Cash rows stay exactly as they are.
   getLedger_().filter(e => e.method === 'Venmo')
               .map(e => e.row).sort((a, b) => b - a)
@@ -127,8 +138,7 @@ function importVenmoStatement(){
   const roster  = activeRoster_();
   const aliases = getAliases_();
   const payRows = [], ledRows = [];
-  const covered = {};
-  let total = 0, credited = 0, review = 0, split = 0;
+  let total = 0, credited = 0, review = 0, split = 0, reused = 0;
 
   for (let i = hdr + 1; i < rows.length; i++){
     const r = rows[i];
@@ -146,7 +156,10 @@ function importVenmoStatement(){
     const id    = String(r[col.id] || '').trim();
     total += amount;
 
-    const parts = allocatePayment_({ payer: payer, amount: amount, note: note }, roster, aliases);
+    // A decision a person already made for this payment wins.
+    const decision = takeDecision_(kept, when, payer, amount);
+    const parts = decision ? decision.filter(d => !d.dismissed)
+                           : allocatePayment_({ payer: payer, amount: amount, note: note }, roster, aliases);
 
     const payRow = [];
     payRow[PAY.ID - 1]     = id;
@@ -155,21 +168,28 @@ function importVenmoStatement(){
     payRow[PAY.PAYER - 1]  = payer;
     payRow[PAY.AMOUNT - 1] = amount;
     payRow[PAY.NOTE - 1]   = note;
-    payRow[PAY.ALLOC - 1]  = parts.length ? parts.map(p => p.name).join(', ') : 'NEEDS REVIEW';
+    payRow[PAY.ALLOC - 1]  = parts.length ? parts.map(p => p.name).join(', ')
+                           : (decision ? 'DISMISSED' : 'NEEDS REVIEW');
     payRows.push(payRow);
 
+    if (decision && !parts.length){                       // dismissed by hand — keep it dismissed
+      ledRows.push(ledgerRow_(stamp, '', '', amount, '', payer, id, '', REVIEW_DISMISSED, note));
+      reused++;
+      continue;
+    }
     if (!parts.length){                                   // couldn't resolve -> review
       ledRows.push(ledgerRow_(stamp, '', '', amount, '', payer, id, '', REVIEW_BAD, note));
       review++;
       continue;
     }
     if (parts.length > 1) split++;
+    if (decision) reused++;
     const group = parts.length > 1 ? 'S' + id.slice(-8) : '';
     parts.forEach(p => {
-      covered[p.rid] = (covered[p.rid] || 0) + p.amount;
-      const w = Math.floor(covered[p.rid] / WEEKLY_DUES);
-      const week = (w > getCurrentWeek()) ? 'Prepay' : String(Math.max(1, w));
-      ledRows.push(ledgerRow_(stamp, p.rid, p.name, p.amount, week, payer, id, group, REVIEW_GOOD, note));
+      const before = covered[p.rid] || 0;
+      covered[p.rid] = before + p.amount;
+      ledRows.push(ledgerRow_(stamp, p.rid, p.name, p.amount, weeksLabel_(before, covered[p.rid]),
+                              payer, id, group, decision ? REVIEW_HAND : REVIEW_GOOD, note));
     });
     credited++;
   }
@@ -183,6 +203,7 @@ function importVenmoStatement(){
     '  Received:   $' + total.toFixed(2) + ' across ' + payRows.length + ' payments\n' +
     '  Allocated:  ' + credited + ' payments (' + split + ' covering more than one person)\n' +
     '  To review:  ' + review + '\n' +
+    '  Kept your hand decisions on ' + reused + ' payment(s)\n' +
     '  Backup:     "' + backup + '"\n\n' +
     (rec.ok ? 'BOOKS BALANCE ✓ — every dollar received is credited to somebody.\n'
             : 'OUT OF BALANCE by $' + rec.difference.toFixed(2) + ' — run checkTheBooks().\n') +
@@ -208,43 +229,80 @@ function ledgerRow_(ts, rid, name, amount, week, payer, source, group, status, m
 
 function logAndReturn_(msg){ Logger.log(msg); return msg; }
 
+/* Every human decision on a Venmo payment (assign, split, dismiss), keyed by
+ * payer + amount, each with its day so a statement row can find it again.
+ * Returns { 'payer|amount': [{ day, parts: [{rid, name, amount, dismissed}] }] } */
+function keptDecisions_(){
+  const groups = {};
+  getLedger_().forEach(e => {
+    if (e.method !== 'Venmo' || !(e.manual || e.dismissed)) return;
+    const key = e.splitGroup ? 'g:' + e.splitGroup : 'r:' + e.row;
+    const g = groups[key] || (groups[key] = { ts: e.ts, payer: e.payer, amount: 0, parts: [] });
+    g.amount += e.amount;
+    g.parts.push({ rid: e.rid, name: e.name, amount: e.amount, dismissed: e.dismissed });
+  });
+  const out = {};
+  Object.keys(groups).forEach(k => {
+    const g = groups[k];
+    const key = normName_(g.payer) + '|' + round2_(g.amount).toFixed(2);
+    (out[key] = out[key] || []).push({ day: tsMillis_(g.ts), parts: g.parts });
+  });
+  return out;
+}
+/* Pull (and use up) the decision for one statement payment, if there is one.
+ * Same payer + amount, within a day either way (emails and statements can
+ * disagree on the date near midnight). */
+function takeDecision_(kept, when, payer, amount){
+  const list = kept[normName_(payer) + '|' + round2_(amount).toFixed(2)];
+  if (!list || !list.length) return null;
+  const t = when.getTime();
+  let best = -1, bestGap = 36 * 60 * 60 * 1000;
+  list.forEach((d, i) => { const gap = Math.abs(d.day - t); if (gap <= bestGap){ best = i; bestGap = gap; } });
+  if (best < 0) return null;
+  return list.splice(best, 1)[0].parts;
+}
+
 
 /* ── Repairs ──────────────────────────────────────────────────────────── */
 
 /** Re-apply the current crediting rules to Venmo rows already in the Ledger.
- *  Use after changing the collector or fixing a roster name. Moves a payment
- *  to whoever actually sent it; sends it to review if the sender isn't on the
- *  roster. Rows you split or assigned by hand are left alone. */
+ *  Use after changing the collector, fixing a roster name or adding an Alias.
+ *  Reads pay codes and names in the note the same way importVenmoStatement
+ *  does, then falls back to the sender. NEVER touches a row a person decided
+ *  (assigned, split, dismissed or logged by hand) — those are what kept being
+ *  "moved" before. A payment the rules now say covers several people is left
+ *  for Possible Splits rather than split silently. */
 function recheckCredits(){
   ensureSchema_();
   const ss = ss_(), led = sheet_(LEDGER_TAB);
   const backup = 'Ledger_bak_' + Utilities.formatDate(new Date(), TIMEZONE, 'yyyyMMdd-HHmmss');
   led.copyTo(ss).setName(backup);
 
-  const roster = activeRoster_();
+  const roster = activeRoster_(), aliases = getAliases_();
   const last = led.getLastRow();
-  if (last < 2) return 'Ledger is empty.';
+  if (last < 2) return logAndReturn_('Ledger is empty.');
   const rng = led.getRange(2, 1, last - 1, LEDGER_HEADERS.length);
   const vals = rng.getValues();
+  const ledger = getLedger_();
 
-  let moved = 0, toReview = 0;
-  vals.forEach(row => {
-    if (String(row[LED.METHOD - 1]).trim() !== 'Venmo') return;
-    if (String(row[LED.SPLIT - 1]).trim()) return;              // hand-split, leave it
-    const payer = String(row[LED.PAYER - 1]).trim();
-    if (!payer) return;
+  let moved = 0, toReview = 0, fixed = 0;
+  vals.forEach((row, i) => {
+    const e = ledger[i];
+    if (e.method !== 'Venmo') return;
+    if (e.splitGroup || e.manual || e.dismissed) return;        // a person or a split decided — leave it
+    if (e.source === 'Dashboard') return;                       // logged by hand
+    if (!e.payer) return;
 
-    const amount = Number(row[LED.AMOUNT - 1]) || 0;
-    const match  = matchSender_({ payer: payer, amount: amount, handle: '', memo: '' }, roster);
-    const ok     = match && isWholeWeeks_(amount);
-    const curRid = String(row[LED.RID - 1]).trim();
+    const parts = allocatePayment_({ payer: e.payer, amount: e.amount, note: e.memo }, roster, aliases);
+    if (parts.length > 1) return;                               // several people -> Possible Splits
+    const target = parts[0];
 
-    if (ok && match.rid !== curRid){
-      row[LED.RID - 1]    = match.rid;
-      row[LED.NAME - 1]   = match.name;
+    if (target && target.rid !== e.rid){
+      row[LED.RID - 1]    = target.rid;
+      row[LED.NAME - 1]   = target.name;
       row[LED.REVIEW - 1] = REVIEW_GOOD;
-      moved++;
-    } else if (!ok && curRid){
+      if (e.review) fixed++; else moved++;
+    } else if (!target && e.rid){
       row[LED.RID - 1]    = '';
       row[LED.NAME - 1]   = '';
       row[LED.WEEK - 1]   = '';
@@ -253,10 +311,8 @@ function recheckCredits(){
     }
   });
   rng.setValues(vals);
-  const msg = 'Re-checked credits: ' + moved + ' moved to the correct sender, ' +
-         toReview + ' sent to review. Backup: "' + backup + '".';
-  Logger.log(msg);
-  return msg;
+  return logAndReturn_('Re-checked credits: ' + moved + ' moved, ' + fixed + ' cleared from review, ' +
+         toReview + ' sent to review. Hand decisions left alone. Backup: "' + backup + '".');
 }
 
 

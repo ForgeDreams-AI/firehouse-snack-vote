@@ -16,10 +16,16 @@ function getDashboardData(){
   const rows = recruitStatus_().sort((a, b) => a.name.localeCompare(b.name));
   const ledger = getLedger_();
 
-  // Money In: split by method across the whole ledger (review rows excluded).
+  const methods = getPaymentMethods_();
+
+  // Money In: split by method across the whole ledger (review/dismissed excluded).
   let cashIn = 0, venmoIn = 0;
+  const byMethod = {};
+  methods.forEach(m => { byMethod[m.name] = 0; });
   ledger.forEach(e => {
-    if (e.review) return;
+    if (!credits_(e)) return;
+    const k = e.method || 'Other';
+    byMethod[k] = round2_((byMethod[k] || 0) + e.amount);
     if (e.method === 'Venmo') venmoIn += e.amount; else cashIn += e.amount;
   });
   const collected = round2_(cashIn + venmoIn);
@@ -27,10 +33,10 @@ function getDashboardData(){
   const spent     = spentToDate_();
   const balance   = round2_(collected - spent);
 
-  // Per-recruit totals split by method (Cash vs Venmo), review rows excluded.
+  // Per-recruit totals split by method, review/dismissed rows excluded.
   const methodMap = {};
   ledger.forEach(e => {
-    if (e.review || !e.rid) return;
+    if (!credits_(e)) return;
     const m = methodMap[e.rid] || (methodMap[e.rid] = {});
     const key = e.method || 'Other';
     m[key] = (m[key] || 0) + e.amount;
@@ -43,13 +49,18 @@ function getDashboardData(){
     method: e.method, source: e.source, memo: e.memo || ''
   }));
 
-  // Recent payments log (newest first) — spot a Venmo that covered two people
-  // (shared SplitGroupID) or one that came from someone else (payer ≠ name).
-  const recent = ledger.slice().reverse().slice(0, 20).map(e => ({
-    ts: (e.ts instanceof Date ? e.ts.getTime() : Number(e.ts)||0), name: e.name || 'Unknown', payer: e.payer || e.name,
-    method: e.method, amount: e.amount, split: e.splitGroup, review: e.review,
-    memo: e.memo || ''
-  }));
+  // Recent payments log — newest PAYMENT first, by when the money actually
+  // arrived (not where the row sits in the sheet: imports and splits append
+  // old payments at the bottom, which used to push them to the top here).
+  const recent = ledger.filter(e => !e.dismissed)
+    .map(e => ({ e: e, t: tsMillis_(e.ts) }))
+    .sort((a, b) => b.t - a.t || b.e.row - a.e.row)
+    .slice(0, 20)
+    .map(x => ({
+      ts: x.t, name: x.e.name || 'Unknown', payer: x.e.payer || x.e.name,
+      method: x.e.method, amount: x.e.amount, split: x.e.splitGroup, review: x.e.review,
+      week: String(x.e.week == null ? '' : x.e.week), memo: x.e.memo || ''
+    }));
 
   // Possible-splits panel: every credited Venmo whose memo names another
   // recruit. The dashboard surfaces these for one-click re-attribution.
@@ -64,7 +75,9 @@ function getDashboardData(){
     unpaidCount: rows.filter(r => !r.paidThisWeek).length,
     collected: collected, expected: expected,
     weeklyDues: WEEKLY_DUES, seasonTotal: TOTAL_PER_RECRUIT,
-    moneyIn: { cash: round2_(cashIn), venmo: round2_(venmoIn), total: collected },
+    moneyIn: { cash: round2_(cashIn), venmo: round2_(venmoIn), total: collected, byMethod: byMethod },
+    methods: methods,
+    pay: { venmo: COLLECTOR_VENMO, prefix: PAY_NOTE_PREFIX },
     kitty:   { collected: collected, spent: spent, balance: balance },
     splitSuggestions: suggestions,
     recon: recon,
@@ -88,11 +101,11 @@ function getDashboardData(){
         label = 'Late ' + late + ' wk' + (late === 1 ? '' : 's') + ' · $' + owed.toFixed(2) + ' owed';
       }
       return {
-        rid: r.rid, name: r.name,
+        rid: r.rid, name: r.name, code: payCode_(r.rid),
         paidThisWeek: r.paidThisWeek,
         paid: paid,
         weeksCovered: r.weeksCovered,                 // drives greyed weeks in the picker
-        cash: mm['Cash'] || 0, venmo: mm['Venmo'] || 0,
+        cash: mm['Cash'] || 0, venmo: mm['Venmo'] || 0, byMethod: mm,
         statusKind: kind, status: label
       };
     }),
@@ -111,7 +124,7 @@ function getDashboardData(){
 // Back-compat: one week of cash at the current week.
 function markCashPaidWeb(rid){ return logPaymentWeb(rid, 'Cash', WEEKLY_DUES); }
 
-/* Single-row logger: method = 'Cash' | 'Venmo', amount in dollars.
+/* Single-row logger: method = any name on the PaymentMethods tab, amount in dollars.
  * payer defaults to the recruit (pass a different name for "someone else paid").
  * weekApplied is optional free text ("Prepay", "5", "5,6,7"). */
 function logPaymentWeb(rid, method, amount, payer, weekApplied){
@@ -119,10 +132,13 @@ function logPaymentWeb(rid, method, amount, payer, weekApplied){
   if (!r) return { ok: false, msg: 'Recruit not found.' };
   amount = round2_(amount);
   if (!(amount > 0)) return { ok: false, msg: 'Enter an amount greater than $0.' };
-  method = (String(method) === 'Venmo') ? 'Venmo' : 'Cash';
+  method = canonicalMethod_(method);
+  if (!method) return { ok: false, msg: 'Unknown payment method — add it under ⚙ Payment methods first.' };
   payer  = String(payer || '').trim() || r.name;
   appendPayment_(rid, r.name, method, amount, 'Dashboard', false,
-                 { payer: payer, weekApplied: (weekApplied != null && String(weekApplied).length) ? weekApplied : undefined });
+                 { payer: payer, status: REVIEW_HAND,
+                   weekApplied: (weekApplied != null && String(weekApplied).length) ? weekApplied : undefined });
+  recordHandPayment_(method, payer, amount, r.name);
   return { ok: true, msg: 'Logged $' + amount.toFixed(2) + ' ' + method + ' for ' + r.name +
            (payer !== r.name ? ' (paid by ' + payer + ')' : '') + '.' };
 }
@@ -135,7 +151,8 @@ function logPaymentWeb(rid, method, amount, payer, weekApplied){
 function logWeeksWeb(rid, method, weeks, customAmount, payer){
   const r = recruitById_(rid);
   if (!r) return { ok: false, msg: 'Recruit not found.' };
-  method = (String(method) === 'Venmo') ? 'Venmo' : 'Cash';
+  method = canonicalMethod_(method);
+  if (!method) return { ok: false, msg: 'Unknown payment method — add it under ⚙ Payment methods first.' };
   payer  = String(payer || '').trim() || r.name;
 
   let wk = (weeks || []).map(Number).filter(n => n >= 1 && n <= SEASON_WEEKS);
@@ -156,28 +173,49 @@ function logWeeksWeb(rid, method, weeks, customAmount, payer){
 
   wk.forEach((w, i) => {
     appendPayment_(rid, r.name, method, amounts[i], 'Dashboard', false,
-                   { payer: payer, weekApplied: String(w) });
+                   { payer: payer, weekApplied: String(w), status: REVIEW_HAND });
   });
 
   const tot = round2_(amounts.reduce((s, a) => s + a, 0));
+  recordHandPayment_(method, payer, tot, r.name);
   return { ok: true, msg: 'Logged ' + wk.length + ' week' + (wk.length === 1 ? '' : 's') + ' ' + method +
            ' ($' + tot.toFixed(2) + ') for ' + r.name + (payer !== r.name ? ' (paid by ' + payer + ')' : '') + '.' };
+}
+
+/* A Venmo logged by hand also goes on the Payments tab, so the books still
+ * balance (the poller's fingerprint check then skips the matching receipt).
+ * Other methods have no bank record to reconcile against. */
+function recordHandPayment_(method, payer, amount, creditedName){
+  if (method !== 'Venmo') return;
+  const stamp = nowStamp_();
+  appendPaymentRecord_('HAND-' + stamp.replace(/\D/g, '') + '-' + Math.floor(Math.random() * 900 + 100),
+                       stamp, 'Venmo', payer, amount, 'Logged by hand on the dashboard', creditedName);
 }
 
 /* Per-recruit drill-down (Feature 1): every payment row for one recruit. */
 function getRecruitPaymentsWeb(rid){
   const r = recruitById_(rid);
-  const rows = getLedger_().filter(e => e.rid === rid && !e.review).map(e => ({
-    ts: e.ts, method: e.method, amount: e.amount, week: e.week,
-    payer: e.payer || e.name, source: e.source, split: e.splitGroup,
-    memo: e.memo || ''
-  }));
+  const rows = getLedger_().filter(e => e.rid === rid && credits_(e))
+    .sort((a, b) => tsMillis_(a.ts) - tsMillis_(b.ts))
+    .map(e => ({
+      ts: tsMillis_(e.ts), method: e.method, amount: e.amount, week: String(e.week == null ? '' : e.week),
+      payer: e.payer || e.name, source: e.source, split: e.splitGroup,
+      memo: e.memo || '', manual: e.manual
+    }));
   let cash = 0, venmo = 0;
-  rows.forEach(p => { if (p.method === 'Venmo') venmo += p.amount; else cash += p.amount; });
-  const weeksCovered = Math.min(Math.floor((cash + venmo) / WEEKLY_DUES), SEASON_WEEKS);
+  const byMethod = {};
+  rows.forEach(p => {
+    byMethod[p.method] = round2_((byMethod[p.method] || 0) + p.amount);
+    if (p.method === 'Venmo') venmo += p.amount; else cash += p.amount;
+  });
+  const total = round2_(cash + venmo);
+  const weeksCovered = Math.min(Math.floor(total / WEEKLY_DUES), SEASON_WEEKS);
+  const owed = Math.max(0, getCurrentWeek() * WEEKLY_DUES - total);
   return { ok: true, rid: rid, name: r ? r.name : rid, rows: rows,
-           cash: round2_(cash), venmo: round2_(venmo), total: round2_(cash + venmo),
-           weeksCovered: weeksCovered };
+           cash: round2_(cash), venmo: round2_(venmo), total: total, byMethod: byMethod,
+           weeksCovered: weeksCovered, owed: owed,
+           code: payCode_(rid), payNote: payNote_([rid]),
+           payLink: venmoPayLink_([rid], owed > 0 ? owed : WEEKLY_DUES) };
 }
 
 function nudgeNowWeb(rid){ return nudgeRecruit_(rid); }
@@ -196,19 +234,25 @@ function assignReviewWeb(row, rid){
   if (row < 2 || row > sh.getLastRow()) return { ok: false, msg: 'Row no longer exists — refresh.' };
   const r = recruitById_(rid);
   if (!r) return { ok: false, msg: 'Recruit not found.' };
+  const orig = getLedger_().filter(e => e.row === row)[0];
+  if (!orig) return { ok: false, msg: 'Row no longer exists — refresh.' };
+  const before = cumulativeMap_(row)[rid] || 0;
   sh.getRange(row, LED.RID).setValue(rid);
   sh.getRange(row, LED.NAME).setValue(r.name);     // credited recruit
-  sh.getRange(row, LED.WEEK).setValue('Prepay');   // cumulative drives status; this is just a label
-  sh.getRange(row, LED.REVIEW).setValue(REVIEW_GOOD);
+  sh.getRange(row, LED.WEEK).setValue(weeksLabel_(before, before + orig.amount));
+  sh.getRange(row, LED.REVIEW).setValue(REVIEW_HAND);   // a person decided — automation won't move it
   // PayerName (col G) intentionally untouched — keeps the original Venmo sender.
+  setPaymentAlloc_(orig.source, r.name);
   return { ok: true, msg: 'Assigned to ' + r.name + '.' };
 }
 
 /* Split ONE unmatched Venmo across N recruits (Feature 1).
  *   assignments = [{ rid, amount, weeks }]  (weeks = "" or "1,2,3")
  * All new rows share the original Source (message-ID) + a fresh SplitGroupID,
- * and carry the original Venmo sender as PayerName. Split amounts must sum to
- * the received amount or the write is blocked. */
+ * and carry the original Venmo sender as PayerName, payment DATE and note —
+ * so the split stays where it happened in history and the poller still
+ * recognises the payment (re-stamping it "now" made the poller re-add it).
+ * Split amounts must sum to the received amount or the write is blocked. */
 function splitVenmoReviewWeb(row, assignments){
   const sh = sheet_(LEDGER_TAB);
   if (row < 2 || row > sh.getLastRow()) return { ok: false, msg: 'Row no longer exists — refresh.' };
@@ -239,22 +283,34 @@ function splitVenmoReviewWeb(row, assignments){
 
   // Write the split rows first, then remove the original review row (so a mid-way
   // failure never silently loses the payment).
+  const method  = orig.method || 'Venmo';
+  const names   = [];
   list.forEach(a => {
     const r = recruitById_(a.rid);
-    appendPayment_(a.rid, r ? r.name : a.rid, 'Venmo', a.amount, source, false,
-                   { payer: payer, splitGroup: splitId, weekApplied: a.weeks || undefined });
+    names.push(r ? r.name : a.rid);
+    appendPayment_(a.rid, r ? r.name : a.rid, method, a.amount, source, false,
+                   { payer: payer, splitGroup: splitId, weekApplied: a.weeks || undefined,
+                     ts: stampOf_(orig.ts), memo: orig.memo, status: REVIEW_HAND, excludeRow: row });
   });
   sh.deleteRow(row);
+  setPaymentAlloc_(source, names.join(', '));
 
   return { ok: true, msg: 'Split $' + received.toFixed(2) + ' from ' + payer + ' across ' +
            list.length + ' recruit' + (list.length === 1 ? '' : 's') + '.' };
 }
 
+/* Not a dues payment. The row is KEPT, marked Dismissed and credited to nobody:
+ * deleting it let the poller find the receipt again and put it straight back. */
 function dismissReviewWeb(row){
   const sh = sheet_(LEDGER_TAB);
   if (row < 2 || row > sh.getLastRow()) return { ok: false, msg: 'Row no longer exists — refresh.' };
-  sh.deleteRow(row);                                 // not a dues payment — remove it
-  return { ok: true, msg: 'Dismissed.' };
+  const orig = getLedger_().filter(e => e.row === row)[0];
+  sh.getRange(row, LED.RID).setValue('');
+  sh.getRange(row, LED.NAME).setValue('');
+  sh.getRange(row, LED.WEEK).setValue('');
+  sh.getRange(row, LED.REVIEW).setValue(REVIEW_DISMISSED);
+  if (orig) setPaymentAlloc_(orig.source, 'DISMISSED');
+  return { ok: true, msg: 'Dismissed — it won\'t come back.' };
 }
 
 /* Split an ALREADY-CREDITED payment (vs splitVenmoReviewWeb which only operates
@@ -273,6 +329,44 @@ function dismissSuggestionWeb(row, source, amount){
   const key = source ? ('src:' + source) : ('row:' + row + ':' + (amount || 0));
   addDismissedSuggestion_(key);
   return { ok: true, msg: 'Dismissed. Run resetDismissedSuggestions() in the editor to bring back.' };
+}
+
+/* ── Payment methods (⚙ on the dashboard) ────────────────────────────────── */
+
+/* Add a method, or update its "send to" / instructions if it already exists. */
+function savePaymentMethodWeb(m){
+  m = m || {};
+  const name = String(m.name || '').trim().replace(/\s+/g, ' ');
+  if (!name) return { ok: false, msg: 'Give the method a name (e.g. Zelle).' };
+  if (name.length > 30) return { ok: false, msg: 'Keep the name under 30 characters.' };
+  const sendTo = String(m.sendTo || '').trim(), instr = String(m.instructions || '').trim();
+  ensureSchema_();
+  const sh = sheet_(METHODS_TAB);
+  const last = sh.getLastRow();
+  const names = last >= 2 ? sh.getRange(2, 1, last - 1, 1).getValues().map(r => String(r[0]).trim().toLowerCase()) : [];
+  const i = names.indexOf(name.toLowerCase());
+  if (i >= 0){
+    sh.getRange(i + 2, 1, 1, METHODS_HEADERS.length).setValues([[sh.getRange(i + 2, 1).getValue(), sendTo, instr]]);
+    return { ok: true, msg: 'Updated ' + name + '.' };
+  }
+  sh.appendRow([name, sendTo, instr]);
+  return { ok: true, msg: 'Added ' + name + '. It now shows in Log Payment and the reminder emails.' };
+}
+
+/* Remove a method. Venmo and Cash can't be removed; past payments keep their method. */
+function removePaymentMethodWeb(name){
+  name = String(name || '').trim();
+  if (BUILTIN_METHODS.some(b => b.toLowerCase() === name.toLowerCase()))
+    return { ok: false, msg: name + ' is built in and can\'t be removed.' };
+  const sh = sheet_(METHODS_TAB);
+  const last = sh ? sh.getLastRow() : 0;
+  for (let r = last; r >= 2; r--){
+    if (String(sh.getRange(r, 1).getValue()).trim().toLowerCase() === name.toLowerCase()){
+      sh.deleteRow(r);
+      return { ok: true, msg: 'Removed ' + name + '. Payments already logged with it are unchanged.' };
+    }
+  }
+  return { ok: false, msg: 'Not found — refresh.' };
 }
 
 function nextSplitGroupId_(){ return 'S' + Utilities.formatDate(new Date(), TIMEZONE, 'yyyyMMdd-HHmmss-') + Math.floor(Math.random() * 900 + 100); }

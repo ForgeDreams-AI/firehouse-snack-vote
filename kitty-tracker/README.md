@@ -34,18 +34,46 @@ sum to the Payments tab, red the moment they drift. Run `checkTheBooks()` any
 time for the same check. If it's green, the money is right and any remaining
 problem is just attribution.
 
+## Pay codes — how payers make sure it's credited right
+
+Every recruit's pay code is their RecruitID (`R012`). A Venmo note of
+**`Kitty R012`** credits R012 automatically — even when it's sent from a
+parent's or partner's account. **`Kitty R012 R015`** splits the payment
+equally between them.
+
+Nobody has to remember this: every reminder email has a **Pay on Venmo**
+button that opens the app with the amount and note already filled in. On the
+dashboard, tap a recruit for their code, a **Copy pay link** button and a
+ready-to-text message. **Who Owes → Copy list** includes everyone's code and the
+how-to-pay instructions for the group chat.
+
+## Payment methods
+
+**⚙ Payment methods** on the dashboard lets the kitty manager add Zelle, Cash
+App, Apple Pay, etc. (name, where to send it, instructions). They show up in
+**Log Payment**, in the money totals, and in the reminder emails. They're
+stored on the **PaymentMethods** tab. Venmo and Cash are built in; Venmo is
+the only one recorded automatically.
+
 ## How money gets credited
 
-- **Credit follows the sender.** Whoever the receipt says paid gets the credit,
-  read from the "*X paid you*" subject line — the only field Venmo writes
-  reliably. The typed note is stored for reference but never decides credit.
+- **A pay code wins.** `Kitty R012` in the note credits R012, whoever sent it.
+- **Otherwise credit follows the sender.** Whoever the receipt says paid gets
+  the credit, read from the "*X paid you*" subject line. Names typed in an
+  email note don't decide credit — they show up under Possible Splits.
+- **Your decisions stick.** Anything you assign, split, dismiss or log by hand
+  is marked `Payment Good! (by hand)` / `Dismissed`. The poller,
+  `recheckCredits()` and `importVenmoStatement()` never move those rows.
+  Dismissed payments stay in the sheet (crediting nobody) so they can't come
+  back.
 - **The collector is never auto-credited.** Their name and @handle are on every
   receipt, so any match on them is ignored.
 - **Only whole-week amounts auto-credit** ($20, $40, $60 …). Odd amounts wait in
   the dashboard's review queue.
 - **Duplicates are impossible.** Every payment is fingerprinted by
   date + payer + amount, so the poller and a statement import can't both record
-  the same payment.
+  the same payment. Fingerprints are counted, so two genuine $20s from one
+  person on one day are both kept.
 - **Paying for someone else is automatic.** A statement note that names other
   recruits ("Kyle Davis, Ivan Hernandez", "for rico", "me and Carson") splits
   the payment across them. Nicknames live in the **Aliases** tab — add a row
@@ -64,7 +92,7 @@ Everything you can run by hand lives in **`Admin.gs`**:
 | Function | What it does |
 |---|---|
 | `importVenmoStatement()` | **The fix-everything button.** Paste a downloaded Venmo statement into a tab named `StatementImport`, run this, and all Venmo is rebuilt from the bank's own record. Cash is never touched. |
-| `recheckCredits()` | Re-applies the crediting rules to existing rows (use after changing the collector or fixing a roster name). |
+| `recheckCredits()` | Re-applies the crediting rules (pay codes, names, Aliases, sender) to automatic rows. Never touches rows you decided by hand. |
 | `removeDuplicatePayments()` | Clears duplicates left by an old bad import. |
 | `previewVenmoParsing()` | Shows what the parser reads from recent receipts, without writing anything. |
 | `installTriggers()` / `removeTriggers()` | Turn the automation on or off. |
@@ -86,4 +114,4 @@ Every one backs the Ledger up to a timestamped tab first and is safe to re-run.
 | `FormIntake.gs` | Sign-up Form → Roster. |
 | `Admin.gs` | Setup, triggers and every by-hand repair tool. |
 
-Tabs: **Roster** · **Ledger** · **Expenses** (plus `Ledger_bak_*` safety copies).
+Tabs: **Roster** · **Ledger** · **Payments** · **Aliases** · **PaymentMethods** · **Expenses** (plus `Ledger_bak_*` safety copies).
