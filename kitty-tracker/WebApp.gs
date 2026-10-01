@@ -3,7 +3,7 @@
 function doGet(){
   ensureSchema_();   // create/upgrade tabs before anything reads them
   return HtmlService.createHtmlOutputFromFile('dashboard')
-    .setTitle('PHX FD Kitty')
+    .setTitle(KITTY_TITLE)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -68,6 +68,8 @@ function getDashboardData(){
   const recon = reconcile_();   // does the Ledger match the bank's record?
 
   return {
+    title: KITTY_TITLE,
+    setup: setupInfo_(),
     week: week, seasonWeeks: SEASON_WEEKS, closed: seasonClosed(),
     paused: isPaused_(),
     activeCount: active,
@@ -111,7 +113,7 @@ function getDashboardData(){
     }),
     review: review,
     recent: recent,
-    // Assign/log dropdown — the collector (Anthony) is excluded so he can never
+    // Assign/log dropdown — the kitty manager is excluded so he can never
     // be credited, not even by a manual mis-click.
     roster: activeRoster_()
       .filter(r => r.name.trim().toLowerCase() !== COLLECTOR_NAME.trim().toLowerCase())

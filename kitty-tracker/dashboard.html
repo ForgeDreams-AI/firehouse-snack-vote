@@ -114,6 +114,36 @@
     </div>
   </div>
 
+  <!-- Academy settings -->
+  <div class="ovl" id="settings">
+    <div class="card">
+      <h2>Academy settings</h2>
+      <p class="sub" id="stIntro" style="margin-bottom:10px"></p>
+      <div id="stFields"></div>
+      <div class="rem" id="stMsg"></div>
+      <div class="modActs" style="margin-top:10px"><button onclick="closeSettings()">Close</button>
+                           <button class="go" id="stSave" onclick="saveSettings()">Save &amp; turn on</button></div>
+      <p class="sub" style="margin-top:14px">Brand-new class? <a href="#" onclick="closeSettings();openNewAcademy();return false">Start a new academy</a> clears the old one first.</p>
+    </div>
+  </div>
+
+  <!-- Start a new academy -->
+  <div class="ovl" id="newAcademy">
+    <div class="card">
+      <h2>Start a new academy</h2>
+      <p style="font-size:13.5px;margin-bottom:10px">This clears <b>every</b> recruit, payment, receipt and sign-up from this sheet so a new class can start fresh.</p>
+      <ul class="sub" style="padding-left:18px;margin-bottom:10px;font-size:12.5px">
+        <li>A full copy of the sheet is saved to your Google Drive first, so nothing is lost.</li>
+        <li>Payment methods and settings stay. You'll set the new start date next.</li>
+        <li>Nothing is credited and no emails go out until the new settings are saved.</li>
+      </ul>
+      <div class="fld"><label>Type NEW ACADEMY to confirm</label><input id="naConfirm" type="text" autocomplete="off"></div>
+      <div class="rem" id="naMsg"></div>
+      <div class="modActs"><button onclick="hide('newAcademy')">Cancel</button>
+                           <button class="go" id="naGo" onclick="startNewAcademy()">Clear &amp; start fresh</button></div>
+    </div>
+  </div>
+
   <!-- Payment methods manager -->
   <div class="ovl" id="methods">
     <div class="card">
@@ -178,6 +208,7 @@
   </div>
 
 <script>
+var OPEN_PANEL = (typeof OPEN_PANEL !== 'undefined') ? OPEN_PANEL : '';
 let DATA = null;
 let M = { method:'Cash', weeks:new Set(), amtTouched:false, weeksCovered:0 };
 let SPLIT = { row:0, amount:0, payer:'' };
@@ -211,8 +242,13 @@ function render(d){
   DATA = d;
   const wk = d.week, pct = d.expected ? Math.min(100,Math.round(d.collected/d.expected*100)) : 0;
   let h = '';
-  h += '<div class="bar"><div class="row2"><h1 style="flex:1">PHX FD Kitty &nbsp;·&nbsp; Week '+wk+'/'+d.seasonWeeks+'</h1>';
+  h += '<div class="bar"><div class="row2"><h1 style="flex:1">'+esc(d.title||'Kitty')+' &nbsp;·&nbsp; Week '+wk+'/'+d.seasonWeeks+'</h1>';
   h += '<button class="'+(d.paused?'warn':'')+'" onclick="togglePause()">'+(d.paused?'▶ Resume reminders':'⏸ Pause reminders')+'</button></div></div>';
+  if(d.setup && !d.setup.done){
+    h += '<div class="review" style="margin-bottom:12px"><b>Finish setting up.</b> Nothing is being tracked or emailed yet. '
+      +  'Fill in the kitty manager, their Venmo and the week 1 start date.'
+      +  '<div class="line"><button class="go" onclick="openSettings()">Open settings</button></div></div>';
+  }
   h += '<div class="row2">';
   h += '<div class="pill">Collected <span class="big">'+money(d.collected)+'</span></div>';
   h += '<div class="pill">Expected <span class="big">'+money(d.expected)+'</span></div>';
@@ -245,7 +281,12 @@ function render(d){
   h += '<div class="acts"><button class="go" onclick="openModal()">+ Log Payment</button>'
     +  '<button onclick="openReceipt()">📁 Add Receipt</button>'
     +  '<button onclick="openOwes()">📋 Who Owes</button>'
-    +  '<button onclick="openMethods()">⚙ Payment methods</button></div>';
+    +  '<button onclick="openMethods()">⚙ Payment methods</button>'
+    +  '<button onclick="openSettings()">🏫 Academy settings</button></div>';
+  if(d.setup && d.setup.formUrl){
+    h += '<p class="sub" style="margin-top:8px">Sign-up form for recruits: <a href="'+esc(d.setup.formUrl)+'" target="_blank">'+esc(d.setup.formUrl)+'</a> '
+      +  '<button onclick="copyText(DATA.setup.formUrl,\'Sign-up link copied.\')" style="padding:3px 8px;font-size:11px">Copy</button></p>';
+  }
 
   // Possible Splits — already-credited payments whose memo names other recruits.
   if(d.splitSuggestions && d.splitSuggestions.length){
@@ -303,6 +344,68 @@ function render(d){
     h += '</tbody></table>';
   }
   document.getElementById('app').innerHTML = h;
+  // Opened from the sheet's 🔥 Kitty menu straight to a panel (or setup isn't done).
+  if(typeof OPEN_PANEL !== 'undefined' && OPEN_PANEL){
+    const p = OPEN_PANEL; OPEN_PANEL = '';
+    if(p === 'newAcademy') openNewAcademy(); else openSettings();
+  } else if(d.setup && !d.setup.done && !SETUP_SHOWN){ SETUP_SHOWN = true; openSettings(); }
+}
+let SETUP_SHOWN = false;
+
+/* ── Academy settings ── */
+function openSettings(){
+  const S = DATA.setup;
+  document.getElementById('stIntro').innerHTML = S.done
+    ? 'Changes apply on the next run. Saving also re-arms the automation.'
+    : 'Welcome! Fill these in and hit <b>Save &amp; turn on</b>. The kitty then runs itself: it reads Venmo receipts from '
+      + (S.runningAs ? '<b>'+esc(S.runningAs)+'</b>' : 'this Google account') + '\'s Gmail and sends reminders on its own.';
+  let h = '';
+  S.defs.forEach(f => {
+    const v = S.values[f.key] == null ? '' : S.values[f.key];
+    const type = f.key === 'seasonStart' ? 'date' : (f.key === 'seasonWeeks' || f.key === 'weeklyDues') ? 'number' : 'text';
+    h += '<div class="fld"><label>'+esc(f.label)+'</label>'
+      +  '<input data-k="'+esc(f.key)+'" type="'+type+'" value="'+esc(v)+'"'+(type==='number'?' min="1" step="any"':'')+'>'
+      +  '<div class="sub">'+esc(f.help)+'</div></div>';
+  });
+  document.getElementById('stFields').innerHTML = h;
+  document.getElementById('stMsg').textContent = '';
+  document.getElementById('stSave').disabled = false;
+  show('settings');
+}
+function closeSettings(){ hide('settings'); }
+function saveSettings(){
+  const v = {};
+  document.querySelectorAll('#stFields input').forEach(i => { v[i.getAttribute('data-k')] = i.value; });
+  const btn = document.getElementById('stSave'), msg = document.getElementById('stMsg');
+  btn.disabled = true; msg.style.color = 'var(--mut)'; msg.textContent = 'Saving and switching the automation on…';
+  google.script.run.withSuccessHandler(r => {
+    btn.disabled = false;
+    if(r && r.ok){ closeSettings(); toast('Saved — the kitty is running.'); load(); }
+    else { msg.style.color = '#ff6b73'; msg.textContent = (r && r.msg) || 'Could not save.'; }
+  }).withFailureHandler(e => { btn.disabled = false; msg.style.color = '#ff6b73'; msg.textContent = 'Error: '+(e&&e.message?e.message:e); })
+    .saveSettingsWeb(v);
+}
+
+/* ── Start a new academy ── */
+function openNewAcademy(){
+  document.getElementById('naConfirm').value = '';
+  document.getElementById('naMsg').textContent = '';
+  document.getElementById('naGo').disabled = false;
+  show('newAcademy');
+}
+function startNewAcademy(){
+  const c = document.getElementById('naConfirm').value;
+  const btn = document.getElementById('naGo'), msg = document.getElementById('naMsg');
+  if(c.trim().toUpperCase() !== 'NEW ACADEMY'){ msg.style.color = '#ff6b73'; msg.textContent = 'Type NEW ACADEMY to confirm.'; return; }
+  btn.disabled = true; msg.style.color = 'var(--mut)'; msg.textContent = 'Saving a copy to Drive, then clearing… (can take a minute)';
+  google.script.run.withSuccessHandler(r => {
+    btn.disabled = false;
+    if(r && r.ok){
+      hide('newAcademy'); toast('Fresh start — now the settings.');
+      OPEN_PANEL = 'settings'; load();
+    } else { msg.style.color = '#ff6b73'; msg.textContent = (r && r.msg) || 'Could not reset.'; }
+  }).withFailureHandler(e => { btn.disabled = false; msg.style.color = '#ff6b73'; msg.textContent = 'Error: '+(e&&e.message?e.message:e); })
+    .startNewAcademyWeb(c);
 }
 
 /* ── Pause toggle ── */
@@ -348,7 +451,7 @@ function owesText(){
   const list = owesList();
   const total = list.reduce((s,o)=>s+o.owed,0);
   const t0 = new Date(), ds = (t0.getMonth()+1)+'/'+t0.getDate();
-  let t = 'PHX FD Kitty — amounts owed through Week '+DATA.week+' ('+ds+')\n\n';
+  let t = (DATA.title||'Kitty')+' — amounts owed through Week '+DATA.week+' ('+ds+')\n\n';
   if(!list.length) return t + 'Everyone is caught up! 🎉';
   list.forEach(o => { t += '• '+o.name+(o.code?' ['+o.code+']':'')+' — '+money(o.owed)+' ('+o.behind+' wk'+(o.behind===1?'':'s')+' behind)\n'; });
   t += '\nTotal outstanding: '+money(total)+' across '+list.length+' '+(list.length===1?'person':'people')+'.';

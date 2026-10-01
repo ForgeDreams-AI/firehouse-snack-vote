@@ -44,8 +44,18 @@ function ensureSchema_(){
   if (!ali){
     ali = ss.insertSheet(ALIASES_TAB);
     ali.getRange(1, 1, 1, ALIASES_HEADERS.length).setValues([ALIASES_HEADERS]);
-    ali.getRange(2, 1, DEFAULT_ALIASES.length, 2).setValues(DEFAULT_ALIASES);
+    if (DEFAULT_ALIASES.length) ali.getRange(2, 1, DEFAULT_ALIASES.length, 2).setValues(DEFAULT_ALIASES);
     ali.setFrozenRows(1);
+  }
+
+  // Settings — every academy-specific value; edited from the dashboard.
+  let set = ss.getSheetByName(SETTINGS_TAB);
+  if (!set){
+    set = ss.insertSheet(SETTINGS_TAB, 0);
+    set.getRange(1, 1, 1, 4).setValues([['Key', 'Value', 'Setting', 'What it means']]);
+    set.getRange(2, 1, SETTING_DEFS.length, 4).setValues(SETTING_DEFS.map(d => [d[0], d[2], d[1], d[3]]));
+    set.getRange(2, 2, SETTING_DEFS.length, 1).setNumberFormat('@');   // keep dates as typed text
+    set.setFrozenRows(1);
   }
 
   // PaymentMethods — the ways recruits can pay; edited from the dashboard.

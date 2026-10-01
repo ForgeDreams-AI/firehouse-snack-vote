@@ -28,6 +28,7 @@
 
 /* Time-driven entry point (every GMAIL_POLL_MINUTES). */
 function parseVenmoInbox(){
+  if (!isSetUp_()) return 0;                   // nothing to credit until Settings are saved
   ensureSchema_();
   const roster  = activeRoster_();
   const aliases = getAliases_();

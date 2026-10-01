@@ -4,6 +4,7 @@
 
 // Bound to every reminder trigger (see Triggers.gs).
 function sendRemindersNow(){
+  if (!isSetUp_())     { Logger.log('Reminders: not set up yet (Kitty menu ▸ Settings) — exiting.'); return; }
   if (isPaused_())     { Logger.log('Reminders: paused — exiting.'); return; }
   if (seasonClosed())  { Logger.log('Reminders: season closed — exiting.'); return; }
 
@@ -31,7 +32,7 @@ function sendOne_(r, week){
   if (!r.email) { Logger.log('No email for ' + r.rid); return; }
   const tmpl = buildEmail_(r, week);
   GmailApp.sendEmail(r.email, tmpl.subject, tmpl.text, {
-    name: 'PHX FD Academy Kitty',
+    name: KITTY_TITLE,
     htmlBody: tmpl.html
   });
   Logger.log('Sent week ' + week + ' reminder to ' + r.name + ' <' + r.email + '> at ' + nowStamp_());
@@ -45,7 +46,7 @@ function buildEmail_(r, week){
   const first = (r.name || 'Recruit').split(/\s+/)[0];
   const owed = r.owed.toFixed(2);
   const weeksBehind = Math.max(1, Math.ceil(r.owed / WEEKLY_DUES));
-  const subject = 'PHX FD Kitty — Week ' + week + ' dues ($' + owed + ' to get current)';
+  const subject = KITTY_TITLE + ' — Week ' + week + ' dues ($' + owed + ' to get current)';
   const code = payCode_(r.rid), note = payNote_([r.rid]);
   const link = venmoPayLink_([r.rid], r.owed);
   const methods = getPaymentMethods_();
@@ -70,7 +71,7 @@ function buildEmail_(r, week){
     methods.map(m => '  • ' + methodText(m)).join('\n') + '\n\n' +
     'You can also prepay the rest of the season ($' + TOTAL_PER_RECRUIT.toFixed(2) + ' total) and never hear from this reminder again.\n\n' +
     (VOTING_SITE_URL ? 'Cast your snack vote here: ' + VOTING_SITE_URL + '\n\n' : '') +
-    '— PHX FD Academy Kitty';
+    '— ' + KITTY_TITLE;
 
   const html =
     '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#15171B;line-height:1.5;max-width:520px">' +
@@ -91,7 +92,7 @@ function buildEmail_(r, week){
         TOTAL_PER_RECRUIT.toFixed(2) + ' total) and these stop entirely.</p>' +
       (VOTING_SITE_URL ? '<p style="margin:14px 0 0;font-size:13px;color:#888">Cast your snack vote here: ' +
         '<a href="' + esc_(VOTING_SITE_URL) + '" style="color:#C8102E">' + esc_(VOTING_SITE_URL) + '</a></p>' : '') +
-      '<p style="margin:4px 0 0;font-size:13px;color:#888">— PHX FD Academy Kitty</p>' +
+      '<p style="margin:4px 0 0;font-size:13px;color:#888">— ' + esc_(KITTY_TITLE) + '</p>' +
     '</div>';
 
   return { subject: subject, text: text, html: html };

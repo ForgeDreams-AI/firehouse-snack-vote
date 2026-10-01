@@ -1,46 +1,215 @@
-/*  Admin.gs — the ONLY file with run-by-hand tools. Everything an operator
- *  ever needs to do lives here, in the order you'd need it.
+/*  Admin.gs — setup, handoff, and the run-by-hand repair tools.
  *  ────────────────────────────────────────────────────────────────────────
  *
- *  NEW CLASS / HANDOFF
- *    1. Edit the SETTINGS block in Config.gs (collector, season start, dues).
- *    2. Run  setUpKitty()   — builds the tabs and installs every trigger.
- *    3. Add recruits: link the sign-up Form, then run syncFormResponses().
- *    4. Share the web-app URL. Done — it runs itself from here.
+ *  EVERYTHING DAY-TO-DAY IS IN THE SHEET'S  🔥 Kitty  MENU — no code editing:
+ *    Open dashboard          — the whole app, right inside the sheet.
+ *    Settings                — academy name, kitty manager, Venmo, start date,
+ *                              weeks, dues. Saving switches the automation on.
+ *    Start a new academy     — archives this sheet to Drive, then clears every
+ *                              recruit, payment and receipt for a fresh class.
+ *    How to hand this off    — the steps for the next kitty manager.
  *
- *  DAY TO DAY
- *    Nothing. The poller records Venmo every 15 minutes and reminders send
- *    themselves. Use the dashboard for cash, splits and the review queue.
+ *  IF THE NUMBERS LOOK WRONG (run from the Apps Script editor)
+ *    importVenmoStatement()  — rebuilds all Venmo from a downloaded statement.
+ *    recheckCredits()        — re-applies the crediting rules.
  *
- *  IF SOMETHING LOOKS WRONG
- *    importVenmoStatement()  — the fix-everything button. Rebuilds all Venmo
- *                              from a downloaded statement (the bank is the
- *                              source of truth). Cash is never touched.
- *    recheckCredits()        — re-applies the crediting rules to existing rows.
- *
- *  Every tool here backs the Ledger up to a timestamped tab first, and every
+ *  Every repair tool backs the Ledger up to a timestamped tab first, and every
  *  one is safe to run twice.                                                */
 
 
-/* ── Setup ────────────────────────────────────────────────────────────── */
+/* ── The Kitty menu ───────────────────────────────────────────────────── */
 
-/** One-time setup for a new season. Idempotent. */
+/* Simple trigger: adds the menu every time the sheet is opened. */
+function onOpen(){
+  SpreadsheetApp.getUi().createMenu('🔥 Kitty')
+    .addItem('Open dashboard', 'openDashboard')
+    .addItem('Settings', 'openSettings')
+    .addSeparator()
+    .addItem('Start a new academy…', 'openNewAcademy')
+    .addItem('How to hand this off', 'showHandoff')
+    .addItem('Turn off automation (old manager)', 'turnOffAutomation')
+    .addToUi();
+}
+
+function dashboardDialog_(open){
+  const html = HtmlService.createHtmlOutput(
+      HtmlService.createHtmlOutputFromFile('dashboard').getContent() +
+      (open ? '<script>OPEN_PANEL=' + JSON.stringify(open) + ';</script>' : ''))
+    .setWidth(1000).setHeight(720);
+  SpreadsheetApp.getUi().showModalDialog(html, KITTY_TITLE);
+}
+function openDashboard(){  ensureSchema_(); dashboardDialog_(isSetUp_() ? '' : 'settings'); }
+function openSettings(){   ensureSchema_(); dashboardDialog_('settings'); }
+function openNewAcademy(){ ensureSchema_(); dashboardDialog_('newAcademy'); }
+
+function showHandoff(){
+  const html = HtmlService.createHtmlOutput(
+    '<div style="font:14px/1.5 Arial,sans-serif;color:#15171B">' +
+    '<p><b>Handing the kitty to a new manager</b></p>' +
+    '<ol style="padding-left:18px">' +
+    '<li>The new manager opens this sheet and does <b>File ▸ Make a copy</b>. ' +
+       'Their copy comes with all of the code.</li>' +
+    '<li>In <b>their</b> copy: <b>🔥 Kitty ▸ Start a new academy</b> (if it\'s a new class), ' +
+       'or just <b>🔥 Kitty ▸ Settings</b>. Fill in their name, their Venmo and the start date, then Save. ' +
+       'Google asks them to allow access once.</li>' +
+    '<li>That\'s it. Venmo receipts are read from <b>their</b> Gmail, so the Venmo account ' +
+       'recruits pay must email that Gmail address.</li>' +
+    '</ol>' +
+    '<p style="color:#555">Optional, for phone access: Extensions ▸ Apps Script ▸ Deploy ▸ New deployment ▸ Web app ▸ Deploy, ' +
+       'and bookmark the link.</p>' +
+    '<p style="color:#555">Once the new manager is running, the old manager opens <b>their</b> sheet and picks ' +
+       '<b>🔥 Kitty ▸ Turn off automation</b> so it stops checking Venmo and sending reminders.</p></div>')
+    .setWidth(520).setHeight(420);
+  SpreadsheetApp.getUi().showModalDialog(html, 'How to hand this off');
+}
+
+
+/* ── Settings (from the dashboard) ────────────────────────────────────── */
+
+/* What the dashboard needs to show the setup screen. */
+function setupInfo_(){
+  const ss = ss_();
+  let formUrl = '';
+  try { formUrl = ss.getFormUrl() || ''; } catch (e){}
+  const values = {};
+  SETTING_DEFS.forEach(d => { values[d[0]] = SETTINGS[d[0]]; });
+  values.managerVenmo = COLLECTOR_VENMO;
+  return {
+    done: isSetUp_(),
+    values: values,
+    defs: SETTING_DEFS.map(d => ({ key: d[0], label: d[1], help: d[3] })),
+    formUrl: formUrl.replace(/\/edit.*$/, '/viewform'),
+    sheetUrl: ss.getUrl(),
+    runningAs: (function(){ try { return Session.getEffectiveUser().getEmail(); } catch (e){ return ''; } })()
+  };
+}
+
+/* Save the Settings tab, then switch the automation on. */
+function saveSettingsWeb(v){
+  v = v || {};
+  const clean = {};
+  const errors = [];
+  SETTING_DEFS.forEach(d => {
+    let x = String(v[d[0]] == null ? '' : v[d[0]]).trim();
+    if (typeof d[2] === 'number'){
+      const n = Number(x);
+      if (!(n > 0)) errors.push(d[1] + ' must be a number above 0.');
+      x = n;
+    }
+    clean[d[0]] = x;
+  });
+  if (!clean.academyName) errors.push('Academy name is required.');
+  if (!clean.managerName) errors.push('Kitty manager name is required.');
+  clean.managerVenmo = clean.managerVenmo.replace(/^@/, '').replace(/\s/g, '');
+  if (!clean.managerVenmo) errors.push('Kitty manager Venmo is required.');
+  else clean.managerVenmo = '@' + clean.managerVenmo;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(clean.seasonStart)) errors.push('Week 1 start date is required.');
+  if (clean.seasonWeeks > 60) errors.push('Number of weeks looks too big.');
+  if (clean.managerEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean.managerEmail)) errors.push('Email doesn\'t look right.');
+  if (errors.length) return { ok: false, msg: errors.join(' ') };
+
+  ensureSchema_();
+  const sh = sheet_(SETTINGS_TAB);
+  const last = sh.getLastRow();
+  const keys = last >= 2 ? sh.getRange(2, 1, last - 1, 1).getValues().map(r => String(r[0]).trim()) : [];
+  SETTING_DEFS.forEach(d => {
+    const i = keys.indexOf(d[0]);
+    if (i >= 0) sh.getRange(i + 2, 2).setNumberFormat('@').setValue(String(clean[d[0]]));
+    else sh.appendRow([d[0], String(clean[d[0]]), d[1], d[3]]);
+  });
+  // Venmo's built-in "send to" follows the manager's handle.
+  setMethodSendTo_('Venmo', clean.managerVenmo);
+
+  const t = installTriggers();
+  return { ok: true, msg: 'Saved. ' + t };
+}
+
+function setMethodSendTo_(name, sendTo){
+  const sh = sheet_(METHODS_TAB);
+  if (!sh) return;
+  for (let r = 2; r <= sh.getLastRow(); r++){
+    if (String(sh.getRange(r, 1).getValue()).trim().toLowerCase() === name.toLowerCase()){
+      sh.getRange(r, 2).setValue(sendTo);
+      return;
+    }
+  }
+}
+
+
+/* ── Start a new academy ──────────────────────────────────────────────── */
+
+const NEW_ACADEMY_CONFIRM = 'NEW ACADEMY';
+function clearedTabs_(){ return [ROSTER_TAB, LEDGER_TAB, PAYMENTS_TAB, EXPENSES_TAB, ALIASES_TAB]; }
+
+/* Wipe this sheet for a brand-new class. First saves a complete copy of the
+ * spreadsheet to Drive (nothing is ever lost), then:
+ *   • clears Roster, Ledger, Payments, Expenses, Aliases and sign-up responses
+ *   • deletes the Ledger_bak_* safety copies and any StatementImport tab
+ *   • resets dismissals, report guards and the pause switch
+ *   • clears the start date, so nothing runs until the new Settings are saved
+ * Payment methods and the rest of the Settings are kept as a starting point. */
+function startNewAcademyWeb(confirmText){
+  if (String(confirmText || '').trim().toUpperCase() !== NEW_ACADEMY_CONFIRM)
+    return { ok: false, msg: 'Type ' + NEW_ACADEMY_CONFIRM + ' to confirm.' };
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(20000); } catch (e){ return { ok: false, msg: 'Busy — try again in a minute.' }; }
+  try {
+    ensureSchema_();
+    const ss = ss_();
+    const stamp = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
+    const archive = ss.copy(KITTY_TITLE + ' — archive ' + stamp);
+
+    clearedTabs_().forEach(name => {
+      const sh = sheet_(name);
+      if (sh && sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+    });
+    let cleared = 0;
+    ss.getSheets().forEach(sh => {
+      const n = sh.getName();
+      if (/^Ledger_bak_/.test(n) || n === 'StatementImport') ss.deleteSheet(sh);
+      else if (/^form responses/i.test(n) && sh.getLastRow() > 1){
+        cleared += sh.getLastRow() - 1;
+        sh.deleteRows(2, sh.getLastRow() - 1);
+      }
+    });
+
+    const props = PropertiesService.getScriptProperties();
+    Object.keys(props.getProperties()).forEach(k => {
+      if (k === PROP_DISMISSED || k === PROP_PAUSED || k.indexOf(REPORT_LOG_PREFIX) === 0) props.deleteProperty(k);
+    });
+
+    // Blank the start date: the tracker stays off until the new Settings are saved.
+    const set = sheet_(SETTINGS_TAB);
+    for (let r = 2; r <= set.getLastRow(); r++){
+      if (String(set.getRange(r, 1).getValue()).trim() === 'seasonStart') set.getRange(r, 2).setValue('');
+    }
+
+    return logAndReturn_obj_({ ok: true, archiveUrl: archive.getUrl(),
+      msg: 'Fresh start. The old academy is saved to Drive as "' + archive.getName() + '". ' +
+           'Now fill in Settings for the new class.' +
+           (cleared ? ' (Cleared ' + cleared + ' old sign-up responses — the sign-up Form itself is unchanged.)' : '') });
+  } finally {
+    lock.releaseLock();
+  }
+}
+function logAndReturn_obj_(o){ Logger.log(o.msg); return o; }
+
+
+/* ── Triggers ─────────────────────────────────────────────────────────── */
+
+/** One-time setup from the editor (the Settings screen does this for you). */
 function setUpKitty(){
   ensureSchema_();
   const t = installTriggers();
-  const msg = 'Tabs ready (Roster, Ledger, Expenses).\n' + t +
-         '\nCollector: ' + COLLECTOR_NAME + ' (' + COLLECTOR_VENMO + ')' +
-         '\nSeason: ' + SEASON_START + ' + ' + SEASON_WEEKS + ' weeks at $' + WEEKLY_DUES +
-         '\nNext: link the sign-up Form and run syncFormResponses().';
-  Logger.log(msg);
-  return msg;
+  return logAndReturn_('Tabs ready.\n' + t +
+    (isSetUp_() ? '' : '\nNext: open the sheet ▸ 🔥 Kitty ▸ Settings and fill them in.'));
 }
 
-/** Install/refresh every trigger: the Venmo poller and the reminder slots. */
+/** Install/refresh every trigger: Venmo poller, reminder slots, sign-up form. */
 function installTriggers(){
   ScriptApp.getProjectTriggers().forEach(t => {
     const f = t.getHandlerFunction();
-    if (f === 'parseVenmoInbox' || f === 'sendRemindersNow') ScriptApp.deleteTrigger(t);
+    if (f === 'parseVenmoInbox' || f === 'sendRemindersNow' || f === 'onRecruitFormSubmit') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('parseVenmoInbox').timeBased().everyMinutes(GMAIL_POLL_MINUTES).create();
   REMINDER_SLOTS.forEach(([day, hour, minute]) => {
@@ -48,10 +217,21 @@ function installTriggers(){
       .onWeekDay(ScriptApp.WeekDay[day]).atHour(hour).nearMinute(minute)
       .inTimezone(TIMEZONE).create();
   });
-  const msg = 'Triggers installed: Venmo poller every ' + GMAIL_POLL_MINUTES +
-         ' min + ' + REMINDER_SLOTS.length + ' reminder slots.';
+  // New sign-ups land on the Roster by themselves.
+  ScriptApp.newTrigger('onRecruitFormSubmit').forSpreadsheet(ss_()).onFormSubmit().create();
+  const msg = 'Automation on: Venmo checked every ' + GMAIL_POLL_MINUTES +
+         ' min, ' + REMINDER_SLOTS.length + ' weekly reminder slots, sign-ups go straight to the Roster.';
   Logger.log(msg);
   return msg;
+}
+
+/* Menu: stop this copy checking Venmo and emailing reminders. */
+function turnOffAutomation(){
+  const ui = SpreadsheetApp.getUi();
+  if (ui.alert('Turn off automation?',
+      'This copy will stop checking Venmo and sending reminder emails. Saving Settings turns it back on.',
+      ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
+  ui.alert(removeTriggers());
 }
 
 function removeTriggers(){

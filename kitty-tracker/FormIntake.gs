@@ -5,7 +5,8 @@
  *        "Full name"   "Email"   "Venmo handle"
  *    Link the Form's responses to THIS spreadsheet (Form ▸ Responses ▸ Link to
  *    Sheets ▸ select this sheet). That creates a "Form Responses 1" tab.
- *    Then run installFormTrigger() ONCE so each new submission auto-fills Roster.
+ *    Saving Settings (🔥 Kitty ▸ Settings) arms the auto-fill; installFormTrigger()
+ *    does the same thing by hand.
  *
  *  WHERE A RESPONSE GOES
  *    1. If the email already exists in Roster -> that row is updated (no dupes).

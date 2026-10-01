@@ -6,17 +6,32 @@ database, Apps Script is the whole backend — nothing to host, nothing to pay f
 
 ---
 
-## Handing it to the next class
+## Handing it to the next manager — no code, ever
 
-1. Open `Config.gs` and edit the **SETTINGS** block at the top — collector name,
-   their Venmo handle and email, season start date, weeks, weekly dues.
-   *That block is the only thing you should ever need to change.*
-2. Run **`setUpKitty()`** once. It builds the tabs and installs every trigger.
-3. Link the sign-up Google Form to this spreadsheet, then run
-   **`syncFormResponses()`** to fill the Roster.
-4. Deploy the web app (Deploy → New deployment → Web app) and share the URL.
+Everything happens from the **🔥 Kitty** menu in the Google Sheet.
 
-That's it. It runs itself from there.
+**New manager:**
+1. Open the kitty sheet and do **File ▸ Make a copy**. The copy brings all the code with it.
+2. In your copy: **🔥 Kitty ▸ Start a new academy…** and type `NEW ACADEMY`.
+   A full copy of the old academy is saved to Drive, then every recruit,
+   payment, receipt and sign-up is cleared.
+3. The Settings screen opens. Fill in the academy name, your name, your Venmo
+   handle and the week 1 start date, then **Save & turn on**. Google asks you to
+   allow access once.
+4. Share the sign-up form link shown on the dashboard. Sign-ups go straight onto the Roster.
+
+That's it. Venmo receipts are read from **your** Gmail, so recruits must pay
+the Venmo account that emails you. Reminders go out on their own, the season
+stops itself after the last week, and **🔥 Kitty ▸ Open dashboard** is the
+whole app.
+
+**Old manager:** in your own sheet, pick **🔥 Kitty ▸ Turn off automation**.
+
+*Optional, for phone access:* Extensions ▸ Apps Script ▸ Deploy ▸ New
+deployment ▸ Web app ▸ Deploy, then bookmark the link.
+
+Until Settings are saved, the tracker stays switched off: nothing is credited
+and no emails go out. All settings live on the **Settings** tab.
 
 ---
 
@@ -105,13 +120,13 @@ Every one backs the Ledger up to a timestamped tab first and is safe to re-run.
 
 | File | Contains |
 |---|---|
-| `Config.gs` | All settings. The only file you edit for a new class. |
+| `Config.gs` | Reads the Settings tab. Nothing to edit. |
 | `Venmo.gs` | Reads receipts from Gmail and credits them. All crediting rules. |
 | `SheetService.gs` | Tab schema and every read/write to the sheet. |
 | `WebApp.gs` + `dashboard.html` | The dashboard. |
 | `Reminders.gs` | Weekly reminder emails. |
 | `Expenses.gs` + `ReceiptReport.gs` | Receipt scanning and spend reports. |
 | `FormIntake.gs` | Sign-up Form → Roster. |
-| `Admin.gs` | Setup, triggers and every by-hand repair tool. |
+| `Admin.gs` | The 🔥 Kitty menu, settings, new academy, triggers and repair tools. |
 
-Tabs: **Roster** · **Ledger** · **Payments** · **Aliases** · **PaymentMethods** · **Expenses** (plus `Ledger_bak_*` safety copies).
+Tabs: **Settings** · **Roster** · **Ledger** · **Payments** · **Aliases** · **PaymentMethods** · **Expenses** (plus `Ledger_bak_*` safety copies).
