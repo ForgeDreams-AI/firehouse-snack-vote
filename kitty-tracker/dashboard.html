@@ -144,6 +144,23 @@
     </div>
   </div>
 
+  <!-- Sign-ups: the form + add by hand -->
+  <div class="ovl" id="signups">
+    <div class="card">
+      <h2>Sign-ups</h2>
+      <div id="suForm"></div>
+      <h2 style="margin-top:18px;font-size:13px">Add someone by hand</h2>
+      <div class="fld"><label>Full name</label><input id="suName" type="text"></div>
+      <div class="fld"><label>Email</label><input id="suEmail" type="email"></div>
+      <div class="fld"><label>Venmo handle (optional)</label><input id="suVenmo" type="text" placeholder="@jane-doe"></div>
+      <label class="sub" style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+        <input id="suSend" type="checkbox" checked> Email them their pay code + Venmo link</label>
+      <div class="rem" id="suMsg"></div>
+      <div class="modActs"><button onclick="hide('signups')">Close</button>
+                           <button class="go" id="suAdd" onclick="addRecruit()">Add recruit</button></div>
+    </div>
+  </div>
+
   <!-- Payment methods manager -->
   <div class="ovl" id="methods">
     <div class="card">
@@ -282,10 +299,12 @@ function render(d){
     +  '<button onclick="openReceipt()">📁 Add Receipt</button>'
     +  '<button onclick="openOwes()">📋 Who Owes</button>'
     +  '<button onclick="openMethods()">⚙ Payment methods</button>'
+    +  '<button onclick="openSignups()">👥 Sign-ups</button>'
     +  '<button onclick="openSettings()">🏫 Academy settings</button></div>';
-  if(d.setup && d.setup.formUrl){
-    h += '<p class="sub" style="margin-top:8px">Sign-up form for recruits: <a href="'+esc(d.setup.formUrl)+'" target="_blank">'+esc(d.setup.formUrl)+'</a> '
-      +  '<button onclick="copyText(DATA.setup.formUrl,\'Sign-up link copied.\')" style="padding:3px 8px;font-size:11px">Copy</button></p>';
+  if(d.setup && d.setup.done && !d.activeCount){
+    h += '<div class="suggest" style="margin-top:10px"><b>No recruits yet.</b> '
+      +  (d.setup.formUrl ? 'Share the sign-up form link and people add themselves.' : 'Create the sign-up form and share the link — people add themselves.')
+      +  '<div class="line" style="margin-top:6px"><button class="go" onclick="openSignups()">👥 Sign-ups</button></div></div>';
   }
 
   // Possible Splits — already-credited payments whose memo names other recruits.
@@ -384,6 +403,56 @@ function saveSettings(){
     else { msg.style.color = '#ff6b73'; msg.textContent = (r && r.msg) || 'Could not save.'; }
   }).withFailureHandler(e => { btn.disabled = false; msg.style.color = '#ff6b73'; msg.textContent = 'Error: '+(e&&e.message?e.message:e); })
     .saveSettingsWeb(v);
+}
+
+/* ── Sign-ups ── */
+function openSignups(){
+  renderSignupForm();
+  ['suName','suEmail','suVenmo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('suMsg').textContent = '';
+  document.getElementById('suAdd').disabled = false;
+  show('signups');
+}
+function renderSignupForm(busy){
+  const u = DATA.setup && DATA.setup.formUrl;
+  let h;
+  if(busy) h = '<p class="sub">Building the form… (10–20 seconds)</p>';
+  else if(u){
+    h = '<p style="font-size:13.5px;margin-bottom:6px">Share this link with the class. Everyone who fills it in lands on the Roster '
+      + 'and gets an email with their pay code and a one-tap Venmo link.</p>'
+      + '<div class="paybox" style="word-break:break-all"><a href="'+esc(u)+'" target="_blank">'+esc(u)+'</a></div>'
+      + '<div class="acts"><button class="go" onclick="copyText(DATA.setup.formUrl,\'Sign-up link copied — paste it in the group chat.\')">📋 Copy link</button>'
+      + '<button onclick="makeForm(true)">Replace with a fresh form</button></div>';
+  } else {
+    h = '<p style="font-size:13.5px;margin-bottom:8px">One tap builds a Google Form (name, email, Venmo handle), links it to this sheet, '
+      + 'and turns on auto-fill. You just share the link.</p>'
+      + '<button class="go" onclick="makeForm(false)">Create sign-up form</button>';
+  }
+  document.getElementById('suForm').innerHTML = h;
+}
+function makeForm(replace){
+  if(replace && !confirm('Make a brand-new sign-up form? The old form stops taking sign-ups (it stays in your Drive). People already on the Roster are kept.')) return;
+  renderSignupForm(true);
+  google.script.run.withSuccessHandler(r => {
+    if(r && r.ok){ DATA.setup.formUrl = r.url; toast(r.msg||'Form ready.'); }
+    else toast((r&&r.msg)||'Could not create the form.');
+    renderSignupForm();
+  }).withFailureHandler(e => { toast('Error: '+(e&&e.message?e.message:e)); renderSignupForm(); })
+    .createSignupFormWeb(!!replace);
+}
+function addRecruit(){
+  const btn = document.getElementById('suAdd'), msg = document.getElementById('suMsg');
+  btn.disabled = true; msg.style.color = 'var(--mut)'; msg.textContent = 'Adding…';
+  google.script.run.withSuccessHandler(r => {
+    btn.disabled = false;
+    if(r && r.ok){
+      msg.style.color = 'var(--good)'; msg.textContent = r.msg;
+      ['suName','suEmail','suVenmo'].forEach(id => document.getElementById(id).value = '');
+      google.script.run.withSuccessHandler(render).getDashboardData();
+    } else { msg.style.color = '#ff6b73'; msg.textContent = (r&&r.msg)||'Could not add.'; }
+  }).withFailureHandler(e => { btn.disabled = false; msg.style.color = '#ff6b73'; msg.textContent = 'Error: '+(e&&e.message?e.message:e); })
+    .addRecruitWeb(document.getElementById('suName').value, document.getElementById('suEmail').value,
+                   document.getElementById('suVenmo').value, document.getElementById('suSend').checked);
 }
 
 /* ── Start a new academy ── */
