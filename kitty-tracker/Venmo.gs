@@ -2,10 +2,12 @@
  *  ────────────────────────────────────────────────────────────────────────
  *  THE RULES, in one place:
  *
- *  1. A payment is credited to the person who SENT it. The sender comes from
- *     the "<Name> paid you" subject line, which is the only reliable field in
- *     a Venmo email. The typed note is recorded but NEVER decides who gets
- *     credit — note-based crediting is what put dues on the wrong people.
+ *  1. A PAY CODE in the note wins: "Kitty R012" credits R012, "Kitty R012
+ *     R015" splits it between them — whoever's account it came from. Codes
+ *     are exact IDs, so they can't be mis-read the way names were.
+ *     Without a code, the payment is credited to the person who SENT it,
+ *     read from the "<Name> paid you" subject line. Names typed in the note
+ *     never decide credit here (they surface in Possible Splits instead).
  *
  *  2. The COLLECTOR is never auto-credited. Their name and @handle appear in
  *     every receipt (they're the recipient), so any match on them is noise.
@@ -16,17 +18,23 @@
  *  4. Every payment carries its REAL payment date and a fingerprint
  *     (date + payer + amount). Both the poller and a statement import build
  *     the same fingerprint, so the same payment can never be recorded twice —
- *     no matter which path it arrives through.
+ *     no matter which path it arrives through. Fingerprints are COUNTED, so
+ *     two genuine $20s from one person on one day are both kept.
+ *
+ *  5. Every payment also lands on the Payments tab, so the books reconcile.
  *
  *  Nothing here needs editing to hand the tracker to a new class; see Config. */
 
 
 /* Time-driven entry point (every GMAIL_POLL_MINUTES). */
 function parseVenmoInbox(){
+  if (!isSetUp_()) return 0;                   // nothing to credit until Settings are saved
   ensureSchema_();
-  const roster = activeRoster_();
-  const seen   = paymentFingerprints_();       // dedupe across ALL ingest paths
-  const label  = getOrCreateLabel_(PROCESSED_LABEL);
+  const roster  = activeRoster_();
+  const aliases = getAliases_();
+  const seen    = paymentFingerprints_();      // dedupe across ALL ingest paths (counts)
+  const thisRun = {};
+  const label   = getOrCreateLabel_(PROCESSED_LABEL);
 
   /* Search by DATE, never by "-label:processed". Gmail threads repeat receipts
    * from the same sender into ONE conversation, so filtering out labeled
@@ -45,10 +53,13 @@ function parseVenmoInbox(){
 
       const when = msg.getDate();                       // REAL payment time
       const fp   = paymentFingerprint_(when, parsed.payer, parsed.amount);
-      if (seen[fp]) return;                             // already recorded
+      // The Nth receipt with this fingerprint is new only if the Ledger holds
+      // fewer than N — so a second real $20 the same day isn't swallowed.
+      thisRun[fp] = (thisRun[fp] || 0) + 1;
+      if (thisRun[fp] <= (seen[fp] || 0)) return;      // already recorded
 
-      creditPayment_(parsed, roster, msg.getId(), when);
-      seen[fp] = true;
+      creditPayment_(parsed, roster, aliases, msg.getId(), when);
+      seen[fp] = thisRun[fp];
       added++;
     });
     thread.addLabel(label);                             // informational only
@@ -57,21 +68,30 @@ function parseVenmoInbox(){
 }
 
 
-/* Write one parsed payment to the Ledger, credited per the rules above. */
-function creditPayment_(parsed, roster, sourceId, when){
-  const match     = matchSender_(parsed, roster);
-  const confident = match && isWholeWeeks_(parsed.amount);
-  appendPayment_(
-    confident ? match.rid  : '',
-    confident ? match.name : '',
-    'Venmo',
-    parsed.amount,
-    sourceId,
-    !confident,                                          // -> review queue
-    { payer: parsed.payer || 'Unknown',
-      memo:  parsed.memo,
-      ts:    Utilities.formatDate(when, TIMEZONE, 'yyyy-MM-dd HH:mm:ss') }
-  );
+/* Write one parsed payment to Payments + Ledger, credited per the rules above. */
+function creditPayment_(parsed, roster, aliases, sourceId, when){
+  const stamp = Utilities.formatDate(when, TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+  const payer = parsed.payer || 'Unknown';
+  let parts = allocatePayment_(
+    { payer: parsed.payer, amount: parsed.amount, note: parsed.memo, codeText: parsed.kittyLine },
+    roster, aliases, { names: false });
+  // A sender matched by @handle (allocatePayment_ only sees the name).
+  if (!parts.length){
+    const match = matchSender_(parsed, roster);
+    if (match && isWholeWeeks_(parsed.amount)) parts = [{ rid: match.rid, name: match.name, amount: parsed.amount }];
+  }
+
+  appendPaymentRecord_(sourceId, stamp, 'Venmo', payer, parsed.amount, parsed.memo,
+                       parts.length ? parts.map(p => p.name).join(', ') : 'NEEDS REVIEW');
+
+  if (!parts.length){                                    // -> review queue
+    appendPayment_('', '', 'Venmo', parsed.amount, sourceId, true,
+                   { payer: payer, memo: parsed.memo, ts: stamp });
+    return;
+  }
+  const group = parts.length > 1 ? nextSplitGroupId_() : '';
+  parts.forEach(p => appendPayment_(p.rid, p.name, 'Venmo', p.amount, sourceId, false,
+                                    { payer: payer, memo: parsed.memo, ts: stamp, splitGroup: group }));
 }
 
 
@@ -132,8 +152,9 @@ function paymentFingerprint_(when, payer, amount){
   return day + '|' + normName_(payer) + '|' + Number(amount).toFixed(2);
 }
 
-/* Fingerprints of every Venmo payment already in the Ledger. Split rows share
- * one original payment, so they're folded back to the group total first. */
+/* How many Venmo payments in the Ledger carry each fingerprint. Split rows
+ * share one original payment, so they're folded back to the group total first.
+ * Review and Dismissed rows count too — they're payments that arrived. */
 function paymentFingerprints_(){
   const groups = {}, out = {};
   getLedger_().forEach(e => {
@@ -144,7 +165,8 @@ function paymentFingerprints_(){
   });
   Object.keys(groups).forEach(k => {
     const g = groups[k];
-    out[paymentFingerprint_(g.ts, g.payer, g.amount)] = true;
+    const fp = paymentFingerprint_(g.ts, g.payer, g.amount);
+    out[fp] = (out[fp] || 0) + 1;
   });
   return out;
 }
@@ -170,7 +192,12 @@ function extractVenmo_(subject, body){
   const hM = hay.match(/@([A-Za-z0-9_-]{3,})/);
   if (hM) handle = hM[1].toLowerCase();
 
-  return { payer: payer, amount: amount, handle: handle, memo: extractNote_(body) };
+  // Any line mentioning the kitty — where a pay code lives even when the
+  // note extractor picks the wrong line.
+  const kittyLine = String(body).split(/\r?\n/)
+    .filter(l => new RegExp('\\b' + PAY_NOTE_PREFIX + '\\b', 'i').test(l)).join(' ');
+
+  return { payer: payer, amount: amount, handle: handle, memo: extractNote_(body), kittyLine: kittyLine };
 }
 
 /* The note the payer typed. Venmo's plain-text emails bury it among headers,
@@ -212,15 +239,18 @@ function getOrCreateLabel_(name){
 function previewVenmoParsing(){
   const threads = GmailApp.search(
     'from:' + VENMO_SENDER + ' (subject:("paid you") OR "paid you") newer_than:14d', 0, 30);
-  const roster = activeRoster_(), out = [];
+  const roster = activeRoster_(), aliases = getAliases_(), out = [];
   threads.forEach(t => t.getMessages().forEach(msg => {
     if (msg.getFrom().toLowerCase().indexOf('venmo') === -1) return;
     const p = extractVenmo_(msg.getSubject(), msg.getPlainBody());
     if (!p) return;
+    let parts = allocatePayment_({ payer: p.payer, amount: p.amount, note: p.memo, codeText: p.kittyLine },
+                                 roster, aliases, { names: false });
     const m = matchSender_(p, roster);
+    if (!parts.length && m && isWholeWeeks_(p.amount)) parts = [{ name: m.name }];
     out.push(Utilities.formatDate(msg.getDate(), TIMEZONE, 'MM/dd') +
              '  $' + p.amount.toFixed(2) + '  from ' + (p.payer || '?') +
-             '  -> ' + (m && isWholeWeeks_(p.amount) ? m.name : 'REVIEW') +
+             '  -> ' + (parts.length ? parts.map(x => x.name).join(' + ') : 'REVIEW') +
              '   note: ' + (p.memo || '(none)'));
   }));
   const txt = out.length ? out.join('\n') : 'No Venmo receipts in the last 14 days.';

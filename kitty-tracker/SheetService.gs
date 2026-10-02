@@ -17,6 +17,11 @@ function ensureSchema_(){
   // Roster
   let ros = ss.getSheetByName(ROSTER_TAB);
   if (!ros){ ros = ss.insertSheet(ROSTER_TAB); ros.getRange(1, 1, 1, ROSTER_HEADERS.length).setValues([ROSTER_HEADERS]); }
+  else if (ros.getLastColumn() < ROSTER_HEADERS.length){
+    // Older Roster: add the Phone / PaysBy headers on the end. Data is untouched.
+    const have = ros.getLastColumn();
+    ros.getRange(1, have + 1, 1, ROSTER_HEADERS.length - have).setValues([ROSTER_HEADERS.slice(have)]);
+  }
 
   // Ledger (create fresh, or migrate existing)
   let led = ss.getSheetByName(LEDGER_TAB);
@@ -44,8 +49,27 @@ function ensureSchema_(){
   if (!ali){
     ali = ss.insertSheet(ALIASES_TAB);
     ali.getRange(1, 1, 1, ALIASES_HEADERS.length).setValues([ALIASES_HEADERS]);
-    ali.getRange(2, 1, DEFAULT_ALIASES.length, 2).setValues(DEFAULT_ALIASES);
+    if (DEFAULT_ALIASES.length) ali.getRange(2, 1, DEFAULT_ALIASES.length, 2).setValues(DEFAULT_ALIASES);
     ali.setFrozenRows(1);
+  }
+
+  // Settings — every academy-specific value; edited from the dashboard.
+  let set = ss.getSheetByName(SETTINGS_TAB);
+  if (!set){
+    set = ss.insertSheet(SETTINGS_TAB, 0);
+    set.getRange(1, 1, 1, 4).setValues([['Key', 'Value', 'Setting', 'What it means']]);
+    set.getRange(2, 1, SETTING_DEFS.length, 4).setValues(SETTING_DEFS.map(d => [d[0], d[2], d[1], d[3]]));
+    set.getRange(2, 2, SETTING_DEFS.length, 1).setNumberFormat('@');   // keep dates as typed text
+    set.setFrozenRows(1);
+  }
+
+  // PaymentMethods — the ways recruits can pay; edited from the dashboard.
+  let met = ss.getSheetByName(METHODS_TAB);
+  if (!met){
+    met = ss.insertSheet(METHODS_TAB);
+    met.getRange(1, 1, 1, METHODS_HEADERS.length).setValues([METHODS_HEADERS]);
+    met.getRange(2, 1, DEFAULT_METHODS.length, METHODS_HEADERS.length).setValues(DEFAULT_METHODS);
+    met.setFrozenRows(1);
   }
 }
 
@@ -143,7 +167,9 @@ function getRoster_(){
       email: String(r[ROS.EMAIL - 1]).trim(),
       venmo: String(r[ROS.VENMO - 1]).trim().replace(/^@/, '').toLowerCase(),
       status: String(r[ROS.STATUS - 1]).trim() || 'Active',
-      notes: String(r[ROS.NOTES - 1]).trim()
+      notes: String(r[ROS.NOTES - 1]).trim(),
+      phone: String(r[ROS.PHONE - 1] == null ? '' : r[ROS.PHONE - 1]).trim(),
+      paysBy: String(r[ROS.PAYSBY - 1] == null ? '' : r[ROS.PAYSBY - 1]).trim()
     });
   });
   return out;
@@ -158,7 +184,9 @@ function getLedger_(){
   const sh = sheet_(LEDGER_TAB);
   if (!sh || sh.getLastRow() < 2) return [];
   const vals = sh.getRange(2, 1, sh.getLastRow() - 1, LEDGER_HEADERS.length).getValues();
-  return vals.map((r, i) => ({
+  return vals.map((r, i) => {
+    const status = String(r[LED.REVIEW - 1] == null ? '' : r[LED.REVIEW - 1]).trim();
+    return {
     row: i + 2,
     ts: r[LED.TS - 1],
     rid: String(r[LED.RID - 1]).trim(),
@@ -170,9 +198,14 @@ function getLedger_(){
     source: String(r[LED.SOURCE - 1]).trim(),
     splitGroup: String(r[LED.SPLIT - 1]).trim(),
     review: isReview_(r[LED.REVIEW - 1]),
+    dismissed: status === REVIEW_DISMISSED,
+    manual: status === REVIEW_HAND,              // a person decided — automation leaves it alone
     memo: String(r[LED.MEMO - 1] == null ? '' : r[LED.MEMO - 1]).trim()
-  }));
+    };
+  });
 }
+// Does this row count toward someone's dues? (Not review, not dismissed.)
+function credits_(e){ return !e.review && !e.dismissed && !!e.rid; }
 // True when a ReviewFlag cell means "needs review" — understands the new
 // "Payment Bad!" wording AND legacy boolean true / "true".
 function isReview_(v){
@@ -180,14 +213,26 @@ function isReview_(v){
   const s = String(v == null ? '' : v).trim().toLowerCase();
   return s === 'true' || s === REVIEW_BAD.toLowerCase();
 }
-// Sum of amounts per RecruitID (review rows are NOT counted toward a recruit).
-function cumulativeMap_(){
+// Sum of amounts per RecruitID (review/dismissed rows are NOT counted).
+// excludeRow leaves one row out — used when that row is about to be replaced.
+function cumulativeMap_(excludeRow){
   const m = {};
   getLedger_().forEach(e => {
-    if (e.review || !e.rid) return;
+    if (!credits_(e) || e.row === excludeRow) return;
     m[e.rid] = (m[e.rid] || 0) + e.amount;
   });
   return m;
+}
+
+/* Which weeks a payment covers, given the recruit's total before and after it:
+ * $40 on top of $140 covers weeks 8-9. Labels the week the money actually
+ * pays for — not the week it happened to arrive in. */
+function weeksLabel_(before, after){
+  const from = Math.floor(round2_(before) / WEEKLY_DUES) + 1;
+  const to   = Math.min(SEASON_WEEKS, Math.floor(round2_(after) / WEEKLY_DUES));
+  if (to < from) return 'Partial';
+  if (from > SEASON_WEEKS) return 'Over';
+  return from === to ? String(from) : from + '-' + to;
 }
 function processedSourceSet_(){
   const s = {};
@@ -196,23 +241,24 @@ function processedSourceSet_(){
 }
 
 /* Append one payment row.
- * opts = { payer, splitGroup, weekApplied, memo }  (all optional)
+ * opts = { payer, splitGroup, weekApplied, memo, ts, status, excludeRow }  (all optional)
  *   payer       → PayerName col; defaults to the credited recruit's name.
  *   splitGroup  → shared SplitGroupID when one inbound payment is split.
  *   weekApplied → explicit WeekApplied text (e.g. "2,3,4" from the week-picker
- *                 or split UI). When omitted, computed from cumulative-after.
- *   memo        → Venmo note (the message the payer typed). Blank for cash. */
+ *                 or split UI). When omitted, the weeks this payment covers.
+ *   memo        → Venmo note (the message the payer typed). Blank for cash.
+ *   ts          → the real payment time; defaults to now.
+ *   status      → Payment Status override (REVIEW_HAND for human decisions).
+ *   excludeRow  → a row being replaced, left out of the running total. */
 function appendPayment_(rid, name, method, amount, source, review, opts){
   opts = opts || {};
-  const after        = (cumulativeMap_()[rid] || 0) + (review ? 0 : amount);
-  const cur          = getCurrentWeek();
-  const weeksCovered = Math.floor(after / WEEKLY_DUES);
+  const before = review ? 0 : (cumulativeMap_(opts.excludeRow)[rid] || 0);
 
   let weekApplied;
   if (review)                                                weekApplied = '';
   else if (opts.weekApplied != null && String(opts.weekApplied).length)
                                                             weekApplied = String(opts.weekApplied);
-  else                                                       weekApplied = (weeksCovered > cur ? 'Prepay' : cur);
+  else                                                       weekApplied = weeksLabel_(before, before + amount);
 
   const payer = (opts.payer != null && String(opts.payer).trim()) ? String(opts.payer).trim() : name;
   const split = opts.splitGroup ? String(opts.splitGroup) : '';
@@ -223,8 +269,59 @@ function appendPayment_(rid, name, method, amount, source, review, opts){
 
   sheet_(LEDGER_TAB).appendRow([
     ts, rid, name, method, amount, weekApplied,
-    payer, source, split, review ? REVIEW_BAD : REVIEW_GOOD, memo
+    payer, source, split, review ? REVIEW_BAD : (opts.status || REVIEW_GOOD), memo
   ]);
+}
+
+/* A Ledger timestamp as the sheet's text format, whether the cell holds a Date or text. */
+function stampOf_(ts){
+  if (ts instanceof Date) return Utilities.formatDate(ts, TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+  return String(ts == null ? '' : ts).trim() || nowStamp_();
+}
+function tsMillis_(ts){
+  if (ts instanceof Date) return ts.getTime();
+  const t = Date.parse(String(ts || '').replace(' ', 'T') + tzOffsetString_());
+  return isNaN(t) ? 0 : t;
+}
+
+/* ── Payment methods ─────────────────────────────────────────────────────── */
+/* [{ name, sendTo, instructions, builtin }] — Venmo and Cash always first. */
+function getPaymentMethods_(){
+  const sh = sheet_(METHODS_TAB);
+  const rows = (sh && sh.getLastRow() >= 2)
+    ? sh.getRange(2, 1, sh.getLastRow() - 1, METHODS_HEADERS.length).getValues() : [];
+  const out = [], seen = {};
+  const add = (name, sendTo, instr) => {
+    const key = name.toLowerCase();
+    if (!name || seen[key]) return;
+    seen[key] = true;
+    out.push({ name: name, sendTo: sendTo, instructions: instr,
+               builtin: BUILTIN_METHODS.some(b => b.toLowerCase() === key) });
+  };
+  BUILTIN_METHODS.forEach(b => {
+    const r = rows.filter(x => String(x[0]).trim().toLowerCase() === b.toLowerCase())[0];
+    const d = DEFAULT_METHODS.filter(x => x[0] === b)[0];
+    add(b, r ? String(r[1]).trim() : d[1], r ? String(r[2]).trim() : d[2]);
+  });
+  rows.forEach(r => add(String(r[0]).trim(), String(r[1]).trim(), String(r[2]).trim()));
+  return out;
+}
+/* The canonical spelling of a method name, or '' if it isn't one. */
+function canonicalMethod_(m){
+  const k = String(m || '').trim().toLowerCase();
+  const hit = getPaymentMethods_().filter(x => x.name.toLowerCase() === k)[0];
+  return hit ? hit.name : '';
+}
+
+/* ── Pay codes + pay links ───────────────────────────────────────────────── */
+function payCode_(rid){ return String(rid || '').trim().toUpperCase(); }
+function payNote_(codes){ return [PAY_NOTE_PREFIX].concat(codes.map(payCode_)).join(' '); }
+/* Venmo link that opens the app with recipient, amount and note filled in. */
+function venmoPayLink_(codes, amount){
+  const handle = String(COLLECTOR_VENMO).replace(/^@/, '');
+  return 'https://venmo.com/' + encodeURIComponent(handle) + '?txn=pay' +
+         (amount > 0 ? '&amount=' + round2_(amount).toFixed(2) : '') +
+         '&note=' + encodeURIComponent(payNote_(codes));
 }
 
 /* ── Expenses (Feature 3) ────────────────────────────────────────────────── */
@@ -265,7 +362,7 @@ function appendExpenseRows_(pid, vendor, items, tax, total, url, notes){
 }
 
 /* Running kitty balance pieces. */
-function collectedToDate_(){ let s = 0; getLedger_().forEach(e => { if (!e.review) s += e.amount; }); return round2_(s); }
+function collectedToDate_(){ let s = 0; getLedger_().forEach(e => { if (credits_(e)) s += e.amount; }); return round2_(s); }
 function spentToDate_(){     let s = 0; getExpenses_().forEach(e => { s += e.total; });               return round2_(s); }
 
 /* ── Derived per-recruit view (the heart of the dashboard) ───────────────── */
@@ -396,8 +493,8 @@ function splitSuggestions_(){
   const dismissed = getDismissedSuggestions_();
   const out = [];
   getLedger_().forEach(e => {
-    if (e.review || !e.memo || !e.rid) return;
-    if (e.splitGroup) return;                                   // already split — skip
+    if (!credits_(e) || !e.memo) return;
+    if (e.splitGroup || e.manual) return;                       // already split / decided by hand — skip
     if (dismissed[suggestionKey_(e)]) return;                   // operator said "Looks fine"
     const mentioned = memoMentionsRecruits_(e.memo, roster);
     if (!mentioned.length) return;

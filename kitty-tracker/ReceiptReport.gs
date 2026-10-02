@@ -34,8 +34,8 @@ function sendSpendReport_(pid){
                                   collected: collected, spent: spent, balance: balance });
 
   // Single send, 55 in BCC. "To" is the academy address itself.
-  GmailApp.sendEmail(SENDER_GMAIL, tmpl.subject, tmpl.text, {
-    name: 'PHX FD Academy Kitty',
+  GmailApp.sendEmail(managerEmail_(), tmpl.subject, tmpl.text, {
+    name: KITTY_TITLE,
     bcc: bcc,
     htmlBody: tmpl.html
   });
@@ -49,7 +49,7 @@ function sendSpendReport_(pid){
 
 /* HTML + plain-text spend report. */
 function buildSpendEmail_(d){
-  const subject = 'PHX FD Kitty — ' + d.vendor + ' run (' + d.when + ') · $' + d.total.toFixed(2);
+  const subject = KITTY_TITLE + ' — ' + d.vendor + ' run (' + d.when + ') · $' + d.total.toFixed(2);
 
   // Plain text
   let text =
@@ -69,7 +69,7 @@ function buildSpendEmail_(d){
     '  Balance remaining: $' + d.balance.toFixed(2) + '\n\n' +
     (d.url ? ('Receipt: ' + d.url + '\n\n') : '') +
     'Cast your vote here: ' + VOTING_SITE_URL + '\n\n' +
-    '— PHX FD Academy Kitty';
+    '— ' + KITTY_TITLE;
 
   // HTML
   let rows = '';
@@ -116,8 +116,13 @@ function buildSpendEmail_(d){
       (d.url ? ('<p style="margin:14px 0 0;font-size:13px"><a href="' + esc_(d.url) + '" style="color:#C8102E">View the receipt</a></p>') : '') +
       '<p style="margin:14px 0 0;font-size:13px;color:#888">Cast your vote here: ' +
         '<a href="' + esc_(VOTING_SITE_URL) + '" style="color:#C8102E">' + esc_(VOTING_SITE_URL) + '</a></p>' +
-      '<p style="margin:4px 0 0;font-size:13px;color:#888">— PHX FD Academy Kitty</p>' +
+      '<p style="margin:4px 0 0;font-size:13px;color:#888">— ' + esc_(KITTY_TITLE) + '</p>' +
     '</div>';
 
   return { subject: subject, text: text, html: html };
+}
+
+/* Where the manager's copy goes: the Settings email, else the account running the kitty. */
+function managerEmail_(){
+  return COLLECTOR_EMAIL || Session.getEffectiveUser().getEmail();
 }
